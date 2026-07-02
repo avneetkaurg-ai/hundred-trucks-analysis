@@ -1,5 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/", "destination": "/hundred_trucks.html" }
-  ]
-}
