@@ -1,0 +1,4 @@
+flask
+gunicorn
+apscheduler
+psycopg2-binary
