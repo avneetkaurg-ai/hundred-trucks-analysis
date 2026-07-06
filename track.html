@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Track Your Shipment</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; background:#f0f4ff; color:#1a1a2e; min-height:100vh; }
+
+    /* HEADER */
+    .header {
+      background:linear-gradient(135deg,#1a3a7a,#2f6fd4);
+      padding:14px 20px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .logo { font-size:18px; font-weight:900; color:#fff; }
+    .logo span { color:#7eb8ff; }
+    .live-badge {
+      display:flex; align-items:center; gap:6px;
+      background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3);
+      color:#fff; font-size:12px; font-weight:600;
+      padding:5px 12px; border-radius:20px;
+    }
+    .dot { width:8px; height:8px; background:#4ade80; border-radius:50%; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .container { max-width:900px; margin:0 auto; padding:20px 16px 40px; }
+
+    /* SHIPMENT CARD */
+    .shipment-card {
+      background:#fff; border-radius:16px;
+      box-shadow:0 2px 16px rgba(0,0,0,0.08);
+      padding:20px; margin-bottom:16px;
+    }
+    .shipment-top { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+    .truck-avatar {
+      width:52px; height:52px;
+      background:linear-gradient(135deg,#1a3a7a,#2f6fd4);
+      border-radius:14px; display:flex; align-items:center; justify-content:center;
+      font-size:24px; flex-shrink:0;
+    }
+    .shipment-title { flex:1; }
+    .shipment-label { font-size:11px; color:#999; text-transform:uppercase; letter-spacing:0.5px; }
+    .shipment-truck { font-size:20px; font-weight:900; color:#1a1a2e; letter-spacing:1px; }
+    .shipment-sub { font-size:12px; color:#666; margin-top:2px; }
+
+    .expiry-tag {
+      background:#fff3e0; border:1px solid #ffe0b2;
+      border-radius:10px; padding:6px 12px; text-align:center; flex-shrink:0;
+    }
+    .expiry-tag-lbl { font-size:10px; color:#e67e22; text-transform:uppercase; font-weight:700; }
+    .expiry-tag-val { font-size:12px; font-weight:700; color:#1a1a2e; margin-top:2px; }
+
+    /* STATS ROW */
+    .stats-row {
+      display:grid; grid-template-columns:repeat(4,1fr);
+      gap:0; border-top:1px solid #f0f0f0; padding-top:14px;
+    }
+    .stat { text-align:center; padding:0 8px; border-right:1px solid #f0f0f0; }
+    .stat:last-child { border-right:none; }
+    .stat-val { font-size:15px; font-weight:800; color:#1a3a7a; }
+    .stat-lbl { font-size:10px; color:#aaa; margin-top:3px; text-transform:uppercase; letter-spacing:0.4px; }
+
+    /* DRIVER CARD */
+    .driver-card {
+      background:#fff; border-radius:16px;
+      box-shadow:0 2px 16px rgba(0,0,0,0.08);
+      padding:16px 20px; margin-bottom:16px;
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    }
+    .driver-avatar {
+      width:44px; height:44px; background:#e8f0fe;
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:20px; flex-shrink:0;
+    }
+    .driver-info { flex:1; }
+    .driver-name { font-size:15px; font-weight:800; color:#1a1a2e; }
+    .driver-role { font-size:11px; color:#999; margin-top:2px; }
+    .driver-actions { display:flex; gap:10px; }
+    .call-btn {
+      display:flex; align-items:center; gap:6px;
+      background:#e8f5e9; color:#2e7d32;
+      border:none; border-radius:10px; padding:8px 16px;
+      font-size:13px; font-weight:700; cursor:pointer; text-decoration:none;
+    }
+    .whatsapp-btn {
+      display:flex; align-items:center; gap:6px;
+      background:#e0f2f1; color:#00695c;
+      border:none; border-radius:10px; padding:8px 16px;
+      font-size:13px; font-weight:700; cursor:pointer; text-decoration:none;
+    }
+
+    /* ETA CARD */
+    .eta-card {
+      background:linear-gradient(135deg,#1a3a7a,#2f6fd4);
+      border-radius:16px; padding:16px 20px; margin-bottom:16px;
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    }
+    .eta-left { color:#fff; }
+    .eta-label { font-size:11px; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.5px; }
+    .eta-value { font-size:22px; font-weight:900; margin-top:4px; }
+    .eta-sub { font-size:12px; color:rgba(255,255,255,0.7); margin-top:2px; }
+    .eta-right { text-align:right; color:#fff; }
+    .eta-dist-lbl { font-size:11px; color:rgba(255,255,255,0.7); }
+    .eta-dist-val { font-size:18px; font-weight:800; margin-top:4px; }
+    .eta-progress { margin-top:10px; background:rgba(255,255,255,0.2); border-radius:10px; height:6px; width:100%; }
+    .eta-progress-fill { background:#4ade80; border-radius:10px; height:6px; transition:width 0.5s; }
+
+    /* MAP */
+    #map { width:100%; height:360px; border-radius:16px; box-shadow:0 2px 12px rgba(0,0,0,0.1); margin-bottom:16px; }
+
+    /* TIMELINE */
+    .timeline-card {
+      background:#fff; border-radius:16px;
+      box-shadow:0 2px 16px rgba(0,0,0,0.08);
+      overflow:hidden;
+    }
+    .tl-head {
+      padding:14px 20px; border-bottom:1px solid #f0f0f0;
+      display:flex; align-items:center; justify-content:space-between;
+      font-size:13px; font-weight:800; color:#1a1a2e;
+    }
+    .tl-count { background:#e8f0fe; color:#1a3a7a; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; }
+    .timeline { padding:8px 0; max-height:300px; overflow-y:auto; }
+    .tl-item {
+      display:flex; gap:12px; padding:10px 20px;
+      cursor:pointer; transition:background 0.15s;
+    }
+    .tl-item:hover { background:#f7f9ff; }
+    .tl-item.active { background:#e8f0fe; }
+    .tl-line { display:flex; flex-direction:column; align-items:center; }
+    .tl-dot { width:11px; height:11px; border-radius:50%; border:2px solid #2f6fd4; background:#fff; flex-shrink:0; margin-top:3px; }
+    .tl-dot.origin { background:#27ae60; border-color:#27ae60; }
+    .tl-dot.current { background:#e74c3c; border-color:#e74c3c; }
+    .tl-connector { width:2px; background:#dde6f5; flex:1; min-height:18px; }
+    .tl-content { flex:1; padding-bottom:4px; }
+    .tl-plaza { font-size:13px; font-weight:700; color:#1a1a2e; }
+    .tl-time { font-size:11px; color:#aaa; margin-top:2px; }
+    .tl-tag { font-size:10px; font-weight:700; margin-top:2px; }
+    .tl-tag.origin { color:#27ae60; }
+    .tl-tag.current { color:#e74c3c; }
+    .tl-tag.toll { color:#2f6fd4; }
+
+    /* EXPIRED */
+    .expired-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.6); z-index:9999;
+      align-items:center; justify-content:center;
+    }
+    .expired-box {
+      background:#fff; border-radius:20px; padding:40px;
+      text-align:center; max-width:320px; margin:20px;
+    }
+    .expired-icon { font-size:48px; margin-bottom:16px; }
+    .expired-title { font-size:20px; font-weight:900; color:#1a1a2e; margin-bottom:8px; }
+    .expired-sub { font-size:14px; color:#888; }
+
+    /* FOOTER */
+    .footer { text-align:center; padding:20px; font-size:11px; color:#bbb; }
+    .footer a { color:#2f6fd4; text-decoration:none; font-weight:600; }
+
+    /* RESPONSIVE */
+    @media(max-width:600px) {
+      .stats-row { grid-template-columns:repeat(2,1fr); }
+      .stat:nth-child(2) { border-right:none; }
+      .stat:nth-child(1), .stat:nth-child(2) { border-bottom:1px solid #f0f0f0; padding-bottom:10px; margin-bottom:10px; }
+      .driver-actions { width:100%; }
+      .call-btn, .whatsapp-btn { flex:1; justify-content:center; }
+      #map { height:280px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">Toll<span>-</span>Trace<span style="color:rgba(255,255,255,0.5);font-weight:300">.cargo</span></div>
+  <div class="live-badge"><div class="dot"></div> Live Tracking</div>
+</div>
+
+<div class="container">
+
+  <!-- Expired overlay -->
+  <div class="expired-overlay" id="expiredOverlay">
+    <div class="expired-box">
+      <div class="expired-icon">🔒</div>
+      <div class="expired-title">Link Expired</div>
+      <div class="expired-sub">This delivery has been completed. The tracking link is no longer active.</div>
+    </div>
+  </div>
+
+  <!-- Shipment card -->
+  <div class="shipment-card">
+    <div class="shipment-top">
+      <div class="truck-avatar">🚛</div>
+      <div class="shipment-title">
+        <div class="shipment-label">Truck Number</div>
+        <div class="shipment-truck" id="truckNo">—</div>
+        <div class="shipment-sub" id="shipperInfo">S S Forwarders · Godrej Shipment</div>
+      </div>
+      <div class="expiry-tag">
+        <div class="expiry-tag-lbl">Link valid till</div>
+        <div class="expiry-tag-val" id="expiryDate">10 Jul 2026</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-val" id="statFrom">—</div>
+        <div class="stat-lbl">Origin</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statTo">—</div>
+        <div class="stat-lbl">Destination</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statPlazas">—</div>
+        <div class="stat-lbl">Tolls Crossed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statUpdate">—</div>
+        <div class="stat-lbl">Last Update</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Driver card -->
+  <div class="driver-card">
+    <div class="driver-avatar">👤</div>
+    <div class="driver-info">
+      <div class="driver-name" id="driverName">—</div>
+      <div class="driver-role">Truck Driver · <span id="driverTruck">—</span></div>
+    </div>
+    <div class="driver-actions">
+      <a class="call-btn" href="tel:+919876543210" id="callBtn">📞 Call</a>
+      <a class="whatsapp-btn" href="https://wa.me/919876543210" target="_blank" id="waBtn">💬 WhatsApp</a>
+    </div>
+  </div>
+
+  <!-- ETA card -->
+  <div class="eta-card">
+    <div class="eta-left">
+      <div class="eta-label">Estimated Arrival</div>
+      <div class="eta-value" id="etaValue">Calculating...</div>
+      <div class="eta-sub" id="etaSub">Based on current speed & route</div>
+    </div>
+    <div class="eta-right">
+      <div class="eta-dist-lbl">Journey Progress</div>
+      <div class="eta-dist-val" id="etaProgress">—</div>
+    </div>
+    <div class="eta-progress" style="width:100%">
+      <div class="eta-progress-fill" id="progressBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- Timeline -->
+  <div class="timeline-card">
+    <div class="tl-head">
+      Route Timeline
+      <div class="tl-count" id="tlCount">0 stops</div>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Powered by <a href="#">Toll-Trace.cargo</a> · Data updates every 2 hours via FASTag
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8081'
+    : 'https://hundred-trucks-analysis.onrender.com';
+  const TRIPS_API = `${API}/api/enroute-trips`;
+  const EXPIRY    = new Date('2026-07-10');
+  const TOKEN     = new URLSearchParams(window.location.search).get('token') || '';
+  const TRUCK_NO  = new URLSearchParams(window.location.search).get('truck') || '';
+
+  const map = L.map('map', { preferCanvas:true, zoomControl:true }).setView([17, 79], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap contributors', maxZoom:18
+  }).addTo(map);
+
+  async function getPincodeCity(pincode) {
+    try {
+      const res  = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+      const data = await res.json();
+      if (data[0].Status === 'Success') {
+        const p = data[0].PostOffice[0];
+        const city = p.District || p.Name;
+        const state = p.State || '';
+        // shorten state to 2-3 letter abbreviation
+        const stateMap = {
+          'Tamil Nadu':'TN','Maharashtra':'MH','Karnataka':'KA','Andhra Pradesh':'AP',
+          'Telangana':'TS','Kerala':'KL','Gujarat':'GJ','Rajasthan':'RJ','Punjab':'PB',
+          'Haryana':'HR','Uttar Pradesh':'UP','Madhya Pradesh':'MP','Bihar':'BR',
+          'West Bengal':'WB','Odisha':'OD','Assam':'AS','Delhi':'DL','Goa':'GA'
+        };
+        const stateCode = stateMap[state] || state.substring(0,2).toUpperCase();
+        return `${city}, ${stateCode}`;
+      }
+    } catch(e) {}
+    return pincode;
+  }
+
+  function fmtTime(dt) {
+    const d = new Date(dt);
+    return d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}) + ' · ' +
+           d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function timeAgo(dt) {
+    const diff = Math.round((Date.now() - new Date(dt)) / 60000);
+    if (diff < 60) return `${diff}m ago`;
+    if (diff < 1440) return `${Math.round(diff/60)}h ago`;
+    return `${Math.round(diff/1440)}d ago`;
+  }
+
+  // Haversine distance in km between two lat/lng points
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // Get lat/lng for a city name using Nominatim
+  async function geocodeCity(cityName) {
+    try {
+      const res  = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName+', India')}&format=json&limit=1`);
+      const data = await res.json();
+      if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch(e) {}
+    return null;
+  }
+
+  async function load() {
+    // Check expiry
+    if (new Date() > EXPIRY) {
+      document.getElementById('expiredOverlay').style.display = 'flex';
+      return;
+    }
+
+    // Resolve actual truck number — token takes priority
+    let resolvedTruck = TRUCK_NO;
+    let crossings = [];
+    try {
+      const url  = TOKEN
+        ? `${API}/api/track?token=${TOKEN}`
+        : `${API}/api/hundred-truck-detail?vehicle_no=${TRUCK_NO}`;
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (data.error) { document.body.innerHTML = '<div style="padding:40px;text-align:center;font-size:18px;">❌ Invalid or expired tracking link.</div>'; return; }
+      resolvedTruck = data.vehicle_no || TRUCK_NO;
+      crossings     = (data.crossings || []).filter(c => c.lat && c.lat !== 0);
+      // set truck number in UI
+      document.getElementById('truckNo').textContent     = resolvedTruck;
+      document.getElementById('driverTruck').textContent = resolvedTruck;
+      const owner = data.truck?.owner || data.truck?.owner_name || '';
+      if (owner && owner !== 'Unknown') document.getElementById('driverName').textContent = owner;
+    } catch(e) {}
+
+    // Fetch trip info using resolved truck number
+    let pickupCity = '—', dropCity = '—', pickupPin = '', dropPin = '';
+    let shipper = '—', tranco = '—';
+    try {
+      const res   = await fetch(TRIPS_API);
+      const data  = await res.json();
+      const trips = data.result?.data || [];
+      const trip  = trips.find(t => t.truck_number.trim() === resolvedTruck.trim());
+      if (trip) {
+        shipper   = trip.shipper || '—';
+        tranco    = trip.tranco  || '—';
+        pickupPin = trip.pickup_pincode;
+        dropPin   = trip.drop_pincode;
+        [pickupCity, dropCity] = await Promise.all([
+          getPincodeCity(pickupPin), getPincodeCity(dropPin)
+        ]);
+      }
+    } catch(e) {}
+
+    document.getElementById('shipperInfo').textContent = `${tranco} · ${shipper} Shipment`;
+    document.getElementById('statFrom').textContent = pickupCity;
+    document.getElementById('statTo').textContent   = dropCity;
+
+    document.getElementById('statPlazas').textContent = crossings.length;
+    document.getElementById('tlCount').textContent    = (crossings.length + 1) + ' stops';
+
+    if (crossings.length > 0) {
+      const last = crossings[crossings.length - 1];
+      document.getElementById('statUpdate').textContent = timeAgo(last.crossed_at);
+
+      // ETA — real calculation using distance from last crossing to destination
+      try {
+        const destCoords = await geocodeCity(dropCity !== '—' ? dropCity : `pincode ${dropPin}`);
+        if (destCoords) {
+          const AVG_SPEED = 50; // km/h average truck speed
+          const remainingKm = haversine(last.lat, last.lng, destCoords.lat, destCoords.lng);
+
+          // Total distance: first crossing to destination
+          const totalKm = haversine(crossings[0].lat, crossings[0].lng, destCoords.lat, destCoords.lng);
+          // Distance covered: first crossing to last crossing
+          const coveredKm = haversine(crossings[0].lat, crossings[0].lng, last.lat, last.lng);
+
+          const progress = Math.min(Math.round((coveredKm / (coveredKm + remainingKm)) * 100), 95);
+          const hoursLeft = remainingKm / AVG_SPEED;
+          const eta = new Date(Date.now() + hoursLeft * 3600000);
+
+          document.getElementById('etaValue').textContent =
+            eta.toLocaleDateString('en-IN',{day:'numeric',month:'short'}) + ' · ' +
+            eta.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+          document.getElementById('etaSub').textContent =
+            `~${Math.round(remainingKm)} km remaining · ~${hoursLeft < 1 ? Math.round(hoursLeft*60)+'min' : Math.round(hoursLeft)+'h'} away`;
+          document.getElementById('etaProgress').textContent = `${progress}% complete`;
+          document.getElementById('progressBar').style.width = progress + '%';
+        } else {
+          throw new Error('no coords');
+        }
+      } catch(e) {
+        // Fallback to time-based estimate
+        const elapsed = (Date.now() - new Date(crossings[0].crossed_at)) / 3600000;
+        const progress = Math.min(Math.round((elapsed / 12) * 100), 95);
+        const hoursLeft = Math.max(Math.round(12 - elapsed), 1);
+        const eta = new Date(Date.now() + hoursLeft * 3600000);
+        document.getElementById('etaValue').textContent =
+          eta.toLocaleDateString('en-IN',{day:'numeric',month:'short'}) + ' · ' +
+          eta.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+        document.getElementById('etaSub').textContent = `~${hoursLeft} hours remaining (estimated)`;
+        document.getElementById('etaProgress').textContent = `${progress}% complete`;
+        document.getElementById('progressBar').style.width = progress + '%';
+      }
+    }
+
+    // Draw map
+    const coords = crossings.map(c => [c.lat, c.lng]);
+    if (coords.length > 1)
+      L.polyline(coords, { color:'#2f6fd4', weight:4, opacity:0.85 }).addTo(map);
+
+    // Origin marker
+    if (coords.length > 0) {
+      L.circleMarker(coords[0], { radius:9, fillColor:'#27ae60', color:'#fff', weight:3, fillOpacity:1 })
+        .bindTooltip(`🏠 ${pickupCity}`, { permanent:true, direction:'top' })
+        .bindPopup(`<b>🏠 Origin: ${pickupCity}</b><br>Pincode: ${pickupPin}`)
+        .addTo(map);
+    }
+
+    // Toll dots
+    crossings.forEach((c, i) => {
+      if (i === 0) return;
+      const isLast = i === crossings.length - 1;
+      const m = L.circleMarker([c.lat, c.lng], {
+        radius: isLast ? 11 : 5,
+        fillColor: isLast ? '#e74c3c' : '#2f6fd4',
+        color:'#fff', weight:2, fillOpacity:1
+      }).bindPopup(`<b>${c.plaza}</b><br>🕐 ${fmtTime(c.crossed_at)}`).addTo(map);
+      if (isLast) m.bindTooltip('📍 Current', { permanent:true, direction:'top' });
+    });
+
+    if (coords.length > 0) map.fitBounds(coords, { padding:[40,40] });
+
+    // Timeline
+    const tl = document.getElementById('timeline');
+    tl.innerHTML = '';
+
+    // Origin row
+    const originDiv = document.createElement('div');
+    originDiv.className = 'tl-item';
+    originDiv.innerHTML = `
+      <div class="tl-line">
+        <div class="tl-dot origin"></div>
+        <div class="tl-connector"></div>
+      </div>
+      <div class="tl-content">
+        <div class="tl-plaza">🏠 ${pickupCity}</div>
+        <div class="tl-time">Pickup · Pincode ${pickupPin}</div>
+        <div class="tl-tag origin">ORIGIN</div>
+      </div>`;
+    if (coords.length > 0) originDiv.onclick = () => map.setView(coords[0], 12);
+    tl.appendChild(originDiv);
+
+    // Toll crossings
+    crossings.forEach((c, i) => {
+      const isLast = i === crossings.length - 1;
+      const div = document.createElement('div');
+      div.className = 'tl-item' + (isLast ? ' active' : '');
+      div.innerHTML = `
+        <div class="tl-line">
+          <div class="tl-dot ${isLast ? 'current' : ''}"></div>
+          ${!isLast ? '<div class="tl-connector"></div>' : ''}
+        </div>
+        <div class="tl-content">
+          <div class="tl-plaza">${isLast ? '📍 ' : ''}${c.plaza}</div>
+          <div class="tl-time">${fmtTime(c.crossed_at)}</div>
+          <div class="tl-tag ${isLast ? 'current' : 'toll'}">${isLast ? 'CURRENT LOCATION' : c.direction}</div>
+        </div>`;
+      div.onclick = () => {
+        document.querySelectorAll('.tl-item').forEach(e => e.classList.remove('active'));
+        div.classList.add('active');
+        map.setView([c.lat, c.lng], 12);
+      };
+      tl.appendChild(div);
+    });
+
+    tl.scrollTop = tl.scrollHeight;
+  }
+
+  load();
+  // Refresh every 2 hours
+  setInterval(load, 2 * 60 * 60 * 1000);
+</script>
+</body>
+</html>
