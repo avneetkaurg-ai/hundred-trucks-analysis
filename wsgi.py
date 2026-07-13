@@ -48,7 +48,7 @@ def fetchone(cur):
     row  = cur.fetchone()
     return dict(zip(cols, row)) if row else None
 
-# ── Static files ──
+# ‚îÄ‚îÄ Static files ‚îÄ‚îÄ
 DASHBOARD_KEY = os.environ.get('DASHBOARD_KEY', 'ml2026secure')
 
 def not_found_page():
@@ -78,7 +78,7 @@ def static_files(filename):
         return not_found_page()
     return send_from_directory('.', filename)
 
-# ── API routes ──
+# ‚îÄ‚îÄ API routes ‚îÄ‚îÄ
 
 @application.route('/api/hundred-trucks')
 def hundred_trucks():
@@ -113,8 +113,8 @@ def hundred_truck_detail():
     return jsonify({
         'truck': truck, 'crossings': crossings, 'plaza_summary': plaza_summary,
         'unique_plazas': len(plaza_summary),
-        'date_from': dates[0][:10] if dates else '—',
-        'date_to':   dates[-1][:10] if dates else '—',
+        'date_from': dates[0][:10] if dates else '‚Äî',
+        'date_to':   dates[-1][:10] if dates else '‚Äî',
     })
 
 @application.route('/api/hundred-plazas')
@@ -198,8 +198,8 @@ def hundred_routes():
                 plazas.append(c['plaza'])
         result.append({'vehicle_no': vno, 'owner': t['owner'] or 'Unknown', 'state': t['state'],
                        'plazas': plazas, 'unique_count': len(set(plazas)),
-                       'first_seen': str(crossings[0]['crossed_at'])[:10] if crossings else '—',
-                       'last_seen':  str(crossings[-1]['crossed_at'])[:10] if crossings else '—'})
+                       'first_seen': str(crossings[0]['crossed_at'])[:10] if crossings else '‚Äî',
+                       'last_seen':  str(crossings[-1]['crossed_at'])[:10] if crossings else '‚Äî'})
     con.close()
     return jsonify({'routes': result})
 
@@ -259,8 +259,8 @@ def track_by_token():
         'vehicle_no': vno,
         'truck': truck,
         'crossings': crossings,
-        'date_from': dates[0][:10] if dates else '—',
-        'date_to':   dates[-1][:10] if dates else '—',
+        'date_from': dates[0][:10] if dates else '‚Äî',
+        'date_to':   dates[-1][:10] if dates else '‚Äî',
     })
 
 @application.route('/api/send-report')
@@ -288,7 +288,7 @@ def ping_truck():
     try:
         records = fetch_zoho(vno)
         new_rows = save_crossings(vno, records)
-        print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Manual ping: {vno} — {len(records)} crossings ({new_rows} new)', flush=True)
+        print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Manual ping: {vno} ‚Äî {len(records)} crossings ({new_rows} new)', flush=True)
         return jsonify({'vehicle_no': vno, 'total': len(records), 'new': new_rows})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -320,7 +320,7 @@ def sync_credit_trips():
         data = json.loads(resp.read())
         trips = data.get('result', {}).get('data', [])
         con = get_db(); cur = con.cursor()
-        # Full replace — delete all, insert current
+        # Full replace ‚Äî delete all, insert current
         cur.execute('DELETE FROM credit_trips')
         for t in trips:
             cur.execute('''
@@ -345,7 +345,7 @@ def credit_trips():
         con = get_db(); cur = con.cursor()
         cur.execute('SELECT truck_no, pickup, drop_pin, tranco, lr_number, lr_date, synced_at FROM credit_trips ORDER BY lr_date DESC, truck_no')
         rows = fetchall(cur); con.close()
-        # Rename drop_pin → drop for frontend compatibility
+        # Rename drop_pin ‚Üí drop for frontend compatibility
         trips = [{'truck_no': r['truck_no'], 'pickup': r['pickup'], 'drop': r['drop_pin'],
                    'tranco': r['tranco'], 'lr_number': r['lr_number'], 'lr_date': r['lr_date']} for r in rows]
         return jsonify({'result': {'data': trips, 'code': '200'}, 'code': 3000})
@@ -415,9 +415,9 @@ def sync_enroute_trips():
             new_drop   = t.get('drop_pincode','').strip()
             if vno in old_map:
                 if old_map[vno]['drop'] != new_drop:
-                    print(f'  ⚠ Destination changed: {vno} — {old_map[vno]["drop"]} → {new_drop}', flush=True)
+                    print(f'  ‚ö† Destination changed: {vno} ‚Äî {old_map[vno]["drop"]} ‚Üí {new_drop}', flush=True)
                 if old_map[vno]['pickup'] != new_pickup:
-                    print(f'  ⚠ Pickup changed: {vno} — {old_map[vno]["pickup"]} → {new_pickup}', flush=True)
+                    print(f'  ‚ö† Pickup changed: {vno} ‚Äî {old_map[vno]["pickup"]} ‚Üí {new_pickup}', flush=True)
 
             # Auto-add new trucks
             cur.execute('SELECT 1 FROM trucks WHERE vehicle_no=%s', (vno,))
@@ -548,14 +548,14 @@ def refresh_all_trucks():
             if records:
                 new_rows = save_crossings(vno, records)
                 ok += 1
-                print(f'  ✓ {vno} — {len(records)} crossings ({new_rows} new)', flush=True)
+                print(f'  ‚úì {vno} ‚Äî {len(records)} crossings ({new_rows} new)', flush=True)
             else:
-                print(f'  — {vno} — no data', flush=True)
+                print(f'  ‚Äî {vno} ‚Äî no data', flush=True)
         except Exception as e:
             fail += 1
-            print(f'  ✗ {vno} — ERROR: {e}', flush=True)
+            print(f'  ‚úó {vno} ‚Äî ERROR: {e}', flush=True)
         time.sleep(3)
-    print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Refresh complete. ✓ {ok} done  ✗ {fail} failed', flush=True)
+    print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Refresh complete. ‚úì {ok} done  ‚úó {fail} failed', flush=True)
 
 def ping_connected():
     con = get_db(); cur = con.cursor()
@@ -567,9 +567,9 @@ def ping_connected():
         try:
             records = fetch_zoho(vno)
             new_rows = save_crossings(vno, records)
-            print(f'  ✓ {vno} — {len(records)} crossings ({new_rows} new)', flush=True)
+            print(f'  ‚úì {vno} ‚Äî {len(records)} crossings ({new_rows} new)', flush=True)
         except Exception as e:
-            print(f'  ✗ {vno} — ERROR: {e}', flush=True)
+            print(f'  ‚úó {vno} ‚Äî ERROR: {e}', flush=True)
         time.sleep(3)
     print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Scheduler: ping complete.', flush=True)
 
@@ -603,13 +603,13 @@ def send_morning_report():
         for t in trucks:
             token = make_token(t['truck_no'])
             link  = f"{base_url}/track.html?token={token}"
-            last  = t['last_seen'].strftime('%d %b, %I:%M %p') if t['last_seen'] else '—'
-            plaza = t['last_plaza'] or '—'
+            last  = t['last_seen'].strftime('%d %b, %I:%M %p') if t['last_seen'] else '‚Äî'
+            plaza = t['last_plaza'] or '‚Äî'
             rows_html += (
                 '<tr>'
                 '<td style="padding:10px;border-bottom:1px solid #eee;font-weight:700;">' + t['truck_no'] + '</td>'
-                '<td style="padding:10px;border-bottom:1px solid #eee;color:#555;">' + (t['tranco'] or '—') + '</td>'
-                '<td style="padding:10px;border-bottom:1px solid #eee;color:#555;">' + (t['loading_point'] or '—') + '</td>'
+                '<td style="padding:10px;border-bottom:1px solid #eee;color:#555;">' + (t['tranco'] or '‚Äî') + '</td>'
+                '<td style="padding:10px;border-bottom:1px solid #eee;color:#555;">' + (t['loading_point'] or '‚Äî') + '</td>'
                 '<td style="padding:10px;border-bottom:1px solid #eee;color:#555;">' + plaza + '<br><span style="font-size:11px;color:#aaa;">' + last + '</span></td>'
                 '<td style="padding:10px;border-bottom:1px solid #eee;">'
                 '<a href="' + link + '" style="background:#2f6fd4;color:#fff;padding:5px 12px;border-radius:5px;text-decoration:none;font-size:12px;">Track Live</a>'
@@ -638,7 +638,7 @@ def send_morning_report():
         )
 
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Daily Truck Report — ' + today
+        msg['Subject'] = 'Daily Truck Report ‚Äî ' + today
         msg['From']    = GMAIL_USER
         msg['To']      = REPORT_TO
         msg.attach(MIMEText(html, 'html'))
@@ -667,7 +667,7 @@ if not os.environ.get('WERKZEUG_RUN_MAIN'):
     scheduler.add_job(sync_enroute_trips, 'cron', hour=18, minute=30)           # midnight IST (18:30 UTC)
     scheduler.add_job(send_morning_report, 'cron', hour=1, minute=0)            # 6:30 AM IST (1:00 UTC)
     scheduler.start()
-    print('APScheduler started — pinging connected trucks every hour.', flush=True)
+    print('APScheduler started ‚Äî pinging connected trucks every hour.', flush=True)
 
 if __name__ == '__main__':
     application.run(debug=True, port=8080)
