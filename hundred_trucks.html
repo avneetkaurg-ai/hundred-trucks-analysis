@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>100 Trucks - FASTag Analysis</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <style>
+    /* ── RESET ── */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; background:#f4f6fb; color:#1a1a2e; }
+
+    /* ── HEADER ── */
+    .header { background:linear-gradient(135deg,#1a3a7a,#2f6fd4); padding:20px 32px; display:flex; align-items:center; justify-content:space-between; }
+    .header-title { font-size:22px; font-weight:900; color:#fff; }
+    .header-sub { font-size:13px; color:rgba(255,255,255,0.7); margin-top:2px; }
+    .header-stats { display:flex; gap:24px; }
+    .hstat { text-align:center; }
+    .hstat-val { font-size:22px; font-weight:900; color:#fff; }
+    .hstat-lbl { font-size:11px; color:rgba(255,255,255,0.6); }
+
+    /* ── LAYOUT ── */
+    .layout { display:flex; height:calc(100vh - 80px); }
+
+    /* ── SECTION 1: TRUCK LIST ── */
+    .truck-list-panel { width:320px; min-width:320px; background:#fff; border-right:1px solid #e8edf5; display:flex; flex-direction:column; }
+    .panel-header { padding:16px 20px; border-bottom:1px solid #e8edf5; }
+    .panel-title { font-size:14px; font-weight:800; color:#1a1a2e; margin-bottom:10px; }
+    .search-box { width:100%; padding:9px 12px; border:1px solid #dde3ee; border-radius:10px; font-size:13px; outline:none; }
+    .filter-row { display:flex; gap:6px; margin-top:8px; }
+    .ftab { padding:5px 12px; border:1px solid #e0e7f0; border-radius:20px; font-size:11px; font-weight:700; color:#888; cursor:pointer; background:#fff; }
+    .ftab.active { background:#2f6fd4; color:#fff; border-color:#2f6fd4; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes flashDiamond { 0%,100%{transform:rotate(45deg) scale(1);opacity:1} 50%{transform:rotate(45deg) scale(1.25);opacity:0.6} }
+    .truck-list { flex:1; overflow-y:auto; }
+    .truck-item { padding:14px 20px; border-bottom:1px solid #f0f4fb; cursor:pointer; transition:background 0.15s; }
+    .truck-item:hover { background:#f8faff; }
+    .truck-item.active { background:#e3f0ff; border-left:3px solid #2f6fd4; }
+    .ti-number { font-size:14px; font-weight:800; color:#1a1a2e; }
+    .ti-owner { font-size:12px; color:#888; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ti-meta { display:flex; gap:8px; margin-top:6px; }
+    .ti-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .ti-badge.tn { background:#e3f0ff; color:#1565c0; }
+    .ti-badge.ka { background:#e8f5e9; color:#2e7d32; }
+    .ti-badge.plazas { background:#f3e5f5; color:#6a1b9a; }
+
+    /* ── SECTION 2: TRUCK DETAIL ── */
+    .detail-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+    .detail-top { padding:20px 24px; background:#fff; border-bottom:1px solid #e8edf5; }
+    .detail-empty { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; color:#aaa; }
+    .detail-empty svg { width:56px; height:56px; fill:#ddd; }
+    .detail-truck-no { font-size:22px; font-weight:900; color:#1a1a2e; }
+    .detail-owner { font-size:13px; color:#888; margin-top:2px; }
+    .detail-chips { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .dchip { font-size:12px; font-weight:600; padding:5px 12px; border-radius:8px; background:#f4f6fb; color:#555; }
+    .dchip.blue { background:#e3f0ff; color:#1565c0; }
+    .dchip.green { background:#e8f5e9; color:#2e7d32; }
+    .dchip.purple { background:#f3e5f5; color:#6a1b9a; }
+
+    /* ── SECTION 3: TABS ── */
+    .detail-tabs { display:flex; border-bottom:1px solid #e8edf5; background:#fff; padding:0 24px; }
+    .dtab { padding:12px 16px; font-size:13px; font-weight:700; color:#aaa; cursor:pointer; border-bottom:2px solid transparent; }
+    .dtab.active { color:#2f6fd4; border-bottom-color:#2f6fd4; }
+
+    /* ── SECTION 4: CROSSINGS TABLE ── */
+    .detail-body { flex:1; overflow-y:auto; padding:20px 24px; }
+    table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+    th { background:#f8faff; padding:10px 14px; font-size:12px; font-weight:700; color:#888; text-align:left; border-bottom:1px solid #e8edf5; }
+    td { padding:10px 14px; font-size:13px; border-bottom:1px solid #f4f6fb; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:#fafbff; }
+    .dir-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; }
+    .dir-N { background:#e8f5e9; color:#2e7d32; }
+    .dir-S { background:#fce4ec; color:#c62828; }
+    .dir-E { background:#fff3e0; color:#e65100; }
+    .dir-W { background:#f3e5f5; color:#6a1b9a; }
+
+    /* ── SECTION 5: UNIQUE PLAZAS ── */
+    .plaza-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:10px; }
+    .plaza-card { background:#fff; border-radius:12px; padding:12px 14px; border:1px solid #e8edf5; }
+    .plaza-name { font-size:13px; font-weight:700; color:#1a1a2e; }
+    .plaza-coords { font-size:11px; color:#aaa; margin-top:3px; }
+    .plaza-count { font-size:11px; font-weight:700; color:#2f6fd4; margin-top:4px; }
+
+    /* ── SECTION 6: JOURNEY TIMELINE ── */
+    .timeline { padding:4px 0; }
+    .tl-item { display:flex; gap:16px; margin-bottom:0; }
+    .tl-left { width:140px; min-width:140px; text-align:right; font-size:12px; color:#888; font-weight:600; padding-top:2px; line-height:1.4; }
+    .tl-center { display:flex; flex-direction:column; align-items:center; }
+    .tl-dot { width:14px; height:14px; border-radius:50%; background:#2f6fd4; border:2px solid #fff; box-shadow:0 0 0 2px #2f6fd4; flex-shrink:0; margin-top:2px; }
+    .tl-dot.start { background:#1a9e6e; box-shadow:0 0 0 2px #1a9e6e; }
+    .tl-dot.end { background:#e53935; box-shadow:0 0 0 2px #e53935; }
+    .tl-line { width:2px; flex:1; background:#e0e7f0; min-height:24px; margin:2px 0; }
+    .tl-item:last-child .tl-line { display:none; }
+    .tl-right { flex:1; padding-bottom:20px; }
+    .tl-plaza { font-size:14px; font-weight:700; color:#1a1a2e; }
+    .tl-meta { font-size:12px; color:#aaa; margin-top:3px; }
+
+    /* ── LOADING ── */
+    .loading { text-align:center; padding:40px; color:#aaa; font-size:14px; }
+    .start-label { background:#fff; color:#1a1a2e; border:none; box-shadow:0 1px 4px rgba(0,0,0,0.15); font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px; white-space:nowrap; }
+  .truck-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 11px;
+    font-weight: 800;
+    color: #1a1a2e;
+    white-space: nowrap;
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+  }
+  .truck-label::before { display: none !important; }
+  .ct-label {
+    background: rgba(255,255,255,0.92);
+    border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .ct-label::before { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     SECTION 1 — HEADER
+════════════════════════════════════════ -->
+<div class="header">
+  <div>
+    <div class="header-title">100 Trucks - FASTag Analysis</div>
+    <div class="header-sub">TN & KA trucks with 10 - 20 unique toll crossings</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:24px;">
+    <div class="header-stats">
+      <div class="hstat"><div class="hstat-val" id="stat-trucks">100</div><div class="hstat-lbl">Trucks</div></div>
+      <div class="hstat"><div class="hstat-val" id="stat-plazas">—</div><div class="hstat-lbl">Unique Plazas</div></div>
+      <div class="hstat"><div class="hstat-val" id="stat-states">TN+KA</div><div class="hstat-lbl">States</div></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="showView('trucks')" id="btn-trucks" style="padding:8px 18px;border-radius:8px;border:2px solid #fff;background:#fff;color:#1a3a7a;font-weight:800;font-size:13px;cursor:pointer;">Trucks</button>
+      <button onclick="showView('map')"    id="btn-map"    style="padding:8px 18px;border-radius:8px;border:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">Map View</button>
+      <button onclick="showView('routes')"  id="btn-routes"  style="padding:8px 18px;border-radius:8px;border:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">All Routes</button>
+      <button onclick="showView('report')"  id="btn-report"  style="padding:8px 18px;border-radius:8px;border:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">Report</button>
+      <button onclick="showView('liveroutes')" id="btn-liveroutes" style="padding:8px 18px;border-radius:8px;border:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">Live Routes</button>
+      <button onclick="showView('credittrips')" id="btn-credittrips" style="padding:8px 18px;border-radius:8px;border:2px solid rgba(255,255,255,0.4);background:transparent;color:#fff;font-weight:800;font-size:13px;cursor:pointer;">Credit Trips</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ════════════════════════════════════════
+       SECTION 2 — TRUCK LIST (LEFT PANEL)
+  ════════════════════════════════════════ -->
+  <div class="truck-list-panel">
+    <div class="panel-header">
+      <div class="panel-title">Select a Truck</div>
+      <input class="search-box" type="text" placeholder="Search truck number or owner..." oninput="filterTrucks(this.value)"/>
+      <div class="filter-row">
+        <button class="ftab active" onclick="filterState('all',this)">All</button>
+        <button class="ftab" onclick="filterState('TN',this)">TN</button>
+        <button class="ftab" onclick="filterState('KA',this)">KA</button>
+        <button class="ftab" onclick="filterState('connected',this)" style="color:#f57c00;border-color:#f57c00;">Connected</button>
+      </div>
+    </div>
+    <div class="truck-list" id="truck-list">
+      <div class="loading">Loading trucks...</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       SECTION 3 — TRUCK DETAIL (RIGHT PANEL)
+  ════════════════════════════════════════ -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-empty" id="detail-empty">
+      <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg>
+      <div style="font-size:15px;font-weight:700;">Select a truck to view details</div>
+      <div style="font-size:13px;">Click any truck from the list on the left</div>
+    </div>
+
+    <div id="detail-content" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+
+      <!-- TRUCK INFO -->
+      <div class="detail-top">
+        <div class="detail-truck-no" id="d-truck-no">—</div>
+        <div class="detail-owner" id="d-owner">—</div>
+        <div class="detail-chips">
+          <div class="dchip blue" id="d-state">—</div>
+          <div class="dchip purple" id="d-plazas">—</div>
+          <div class="dchip green" id="d-crossings">—</div>
+          <div class="dchip" id="d-date-range">—</div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="detail-tabs">
+        <div class="dtab active" onclick="switchTab('crossings',this)">All Crossings</div>
+        <div class="dtab" onclick="switchTab('plazas',this)">Unique Plazas</div>
+        <div class="dtab" onclick="switchTab('timeline',this)">Journey Timeline</div>
+      </div>
+
+      <!-- TAB CONTENT -->
+      <div class="detail-body">
+
+        <!-- ════ SECTION 4: ALL CROSSINGS TABLE ════ -->
+        <div id="tab-crossings">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Toll Plaza</th>
+                <th>Date & Time</th>
+                <th>Direction</th>
+                <th>Coordinates</th>
+              </tr>
+            </thead>
+            <tbody id="crossings-body"></tbody>
+          </table>
+        </div>
+
+        <!-- ════ SECTION 5: UNIQUE PLAZAS GRID ════ -->
+        <div id="tab-plazas" style="display:none;">
+          <div class="plaza-grid" id="plazas-grid"></div>
+        </div>
+
+        <!-- ════ SECTION 6: JOURNEY TIMELINE ════ -->
+        <div id="tab-timeline" style="display:none;height:100%;position:relative;">
+          <div id="journey-map" style="height:100%;width:100%;"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════
+     SECTION 8 — ALL ROUTES VIEW
+════════════════════════════════════════ -->
+<div id="routes-view" style="display:none;flex-direction:column;height:calc(100vh - 80px);background:#f4f6fb;">
+
+  <!-- Routes header bar -->
+  <div style="background:#fff;padding:14px 28px;border-bottom:1px solid #e8edf5;display:flex;align-items:center;gap:16px;">
+    <div style="font-size:15px;font-weight:800;color:#1a1a2e;">All Truck Routes</div>
+    <div style="font-size:13px;color:#888;">Showing route of each truck from first to last crossing</div>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button onclick="filterRoutes('all')"  id="rf-all" style="padding:5px 14px;border-radius:20px;border:1px solid #2f6fd4;background:#2f6fd4;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">All</button>
+      <button onclick="filterRoutes('TN')"   id="rf-tn"  style="padding:5px 14px;border-radius:20px;border:1px solid #dde3ee;background:#fff;color:#888;font-size:12px;font-weight:700;cursor:pointer;">TN</button>
+      <button onclick="filterRoutes('KA')"   id="rf-ka"  style="padding:5px 14px;border-radius:20px;border:1px solid #dde3ee;background:#fff;color:#888;font-size:12px;font-weight:700;cursor:pointer;">KA</button>
+    </div>
+  </div>
+
+  <!-- Routes list -->
+  <div id="routes-list" style="flex:1;overflow-y:auto;padding:20px 28px;">
+    <div style="text-align:center;padding:40px;color:#aaa;">Loading routes...</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SECTION 9 — PLAZA REPORT VIEW
+════════════════════════════════════════ -->
+<div id="report-view" style="display:none;flex-direction:column;height:calc(100vh - 80px);background:#f4f6fb;">
+
+  <div style="background:#fff;padding:14px 28px;border-bottom:1px solid #e8edf5;display:flex;align-items:center;gap:16px;">
+    <div style="font-size:15px;font-weight:800;color:#1a1a2e;">Plaza → Trucks Report</div>
+    <div style="font-size:13px;color:#888;">Which trucks pass through each toll plaza</div>
+    <div style="margin-left:auto;">
+      <input id="report-search" type="text" placeholder="Search plaza..." oninput="filterReport(this.value)"
+        style="padding:7px 14px;border:1px solid #dde3ee;border-radius:10px;font-size:13px;outline:none;width:220px;"/>
+    </div>
+  </div>
+
+  <div id="report-list" style="flex:1;overflow-y:auto;padding:20px 28px;">
+    <div style="text-align:center;padding:40px;color:#aaa;">Loading report...</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     CREDIT TRIPS VIEW
+════════════════════════════════════════ -->
+<div id="credittrips-view" style="display:none;flex-direction:column;height:calc(100vh - 80px);">
+  <div style="background:#fff;padding:14px 28px;border-bottom:1px solid #e8edf5;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="font-size:15px;font-weight:800;color:#1a1a2e;">Credit Trip - Live</div>
+    <div style="font-size:13px;color:#888;">Auto-refreshes: 12:30 PM · 5:30 PM · 11:30 PM</div>
+    <div style="margin-left:auto;font-size:12px;color:#888;" id="ct-summary">—</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;">
+    <div id="credit-trips-map" style="flex:1;height:100%;"></div>
+    <div style="width:260px;background:#fff;border-left:1px solid #e8edf5;overflow-y:auto;padding:14px;">
+      <div style="font-size:13px;font-weight:800;color:#1a1a2e;margin-bottom:12px;">Trip Status</div>
+      <div id="ct-truck-cards"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     LIVE ROUTES VIEW
+════════════════════════════════════════ -->
+<div id="liveroutes-view" style="display:none;flex-direction:column;height:calc(100vh - 80px);">
+  <div style="background:#fff;padding:14px 28px;border-bottom:1px solid #e8edf5;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="font-size:15px;font-weight:800;color:#1a1a2e;">Live Routes - Connected Trucks</div>
+    <div style="background:#f0f4ff;border:1.5px solid #c3d0f0;border-radius:10px;padding:8px 18px;display:flex;flex-direction:column;gap:2px;">
+      <span style="font-size:10px;font-weight:700;color:#6b7eb5;text-transform:uppercase;letter-spacing:0.6px;">Last Ping</span>
+      <span style="font-size:17px;font-weight:800;color:#1a3a7a;" id="lr-last-ping">—</span>
+    </div>
+    <div style="background:#edfaf4;border:1.5px solid #b2e4cc;border-radius:10px;padding:8px 18px;display:flex;flex-direction:column;gap:2px;">
+      <span style="font-size:10px;font-weight:700;color:#2e7d56;text-transform:uppercase;letter-spacing:0.6px;">Next Ping</span>
+      <span style="font-size:17px;font-weight:800;color:#1a5c35;" id="lr-next-ping">—</span>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;" id="lr-legend"></div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;">
+    <div id="live-routes-map" style="flex:1;height:100%;"></div>
+    <div style="width:260px;background:#fff;border-left:1px solid #e8edf5;overflow-y:auto;padding:14px;">
+      <div style="font-size:13px;font-weight:800;color:#1a1a2e;margin-bottom:8px;">Truck Status</div>
+      <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Movement Status</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#555;">
+          <span style="width:10px;height:10px;border-radius:50%;background:#2ecc71;display:inline-block;flex-shrink:0;"></span>
+          Moving (last crossing &lt; 2 hrs ago)
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#555;">
+          <svg width="12" height="14" viewBox="0 0 14 16"><line x1="2" y1="1" x2="2" y2="15" stroke="#f39c12" stroke-width="1.8" stroke-linecap="round"/><polygon points="2,1 13,5 2,9" fill="#f39c12"/></svg>
+          No movement 2–4 hrs
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#555;">
+          <svg width="12" height="14" viewBox="0 0 14 16"><line x1="2" y1="1" x2="2" y2="15" stroke="#e74c3c" stroke-width="1.8" stroke-linecap="round"/><polygon points="2,1 13,5 2,9" fill="#e74c3c"/></svg>
+          No movement 4+ hrs
+        </div>
+      </div>
+      <div id="lr-truck-cards"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SECTION 7 — MAP VIEW (TOP LEVEL)
+════════════════════════════════════════ -->
+<div id="map-view" style="display:none;flex-direction:column;height:calc(100vh - 80px);">
+  <!-- Map + Slider wrapper -->
+  <div style="flex:1;display:flex;flex-direction:row;overflow:hidden;min-height:0;">
+  <div id="truck-map" style="flex:1;height:100%;"></div>
+  <!-- Report Board -->
+  <div id="map-report" style="width:270px;min-width:270px;background:#fff;border-left:1px solid #e8edf5;overflow-y:auto;padding:16px 14px;">
+
+    <!-- Toggle -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button id="toggle-plazas" onclick="switchLayer('plazas')" style="flex:1;padding:8px;border-radius:8px;border:none;background:#2f6fd4;color:#fff;font-weight:800;font-size:12px;cursor:pointer;">Plazas</button>
+      <button id="toggle-trucks" onclick="switchLayer('trucks')" style="flex:1;padding:8px;border-radius:8px;border:none;background:#f0f4fb;color:#888;font-weight:800;font-size:12px;cursor:pointer;">Trucks</button>
+    </div>
+
+    <!-- Plaza report -->
+    <div id="report-plazas">
+    <div style="font-size:13px;font-weight:800;color:#1a1a2e;margin-bottom:12px;">📊 Plaza Report</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div style="background:#e3f0ff;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:18px;font-weight:900;color:#1565c0;" id="rpt-total-plazas">—</div>
+        <div style="font-size:10px;color:#555;margin-top:2px;">Total Plazas</div>
+      </div>
+      <div style="background:#e8f5e9;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:18px;font-weight:900;color:#2e7d32;" id="rpt-total-trucks">100</div>
+        <div style="font-size:10px;color:#555;margin-top:2px;">Trucks</div>
+      </div>
+    </div>
+    <!-- Legend -->
+    <div style="background:#f8faff;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:12px;line-height:2;">
+      <b style="font-size:12px;color:#1a1a2e;">Dot Color</b><br>
+      <span style="color:#e53935;font-size:16px;">●</span> 10+ trucks (busy)<br>
+      <span style="color:#f57c00;font-size:16px;">●</span> 5 - 9 trucks<br>
+      <span style="color:#1a9e6e;font-size:16px;">●</span> 1 - 4 trucks
+    </div>
+    <!-- Plaza click detail -->
+    <div id="rpt-plaza-detail" style="display:none;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <button onclick="closePlazaDetail()" style="border:none;background:none;font-size:16px;cursor:pointer;color:#888;">←</button>
+        <div style="font-size:13px;font-weight:800;color:#1a1a2e;" id="rpt-plaza-name">—</div>
+      </div>
+      <div id="rpt-plaza-trucks"></div>
+    </div>
+
+    <div id="rpt-plaza-list">
+    <div style="font-size:12px;font-weight:800;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Top 15 Busiest Plazas</div>
+    <div id="rpt-top-plazas"></div>
+    </div>
+    </div><!-- end report-plazas -->
+
+    <!-- Truck report -->
+    <div id="report-trucks" style="display:none;">
+      <div style="font-size:13px;font-weight:800;color:#1a1a2e;margin-bottom:12px;">Truck Locations</div>
+      <div style="background:#f8faff;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;line-height:2;">
+        <b style="font-size:12px;color:#1a1a2e;">Each dot = last known position</b><br>
+        <span style="color:#2f6fd4;font-size:16px;">●</span> TN trucks<br>
+        <span style="color:#e65100;font-size:16px;">●</span> KA trucks
+      </div>
+      <div id="last-seen-header" style="font-size:12px;font-weight:800;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Last Seen</div>
+      <div id="rpt-truck-list"></div>
+    </div>
+
+  </div>
+  </div><!-- end map+report wrapper -->
+
+  <!-- Timeline Slider -->
+  <div id="map-slider-bar" style="display:none;background:#1a1a2e;border-top:2px solid #2f6fd4;padding:12px 24px;align-items:center;gap:16px;">
+    <div style="display:flex;flex-direction:column;gap:2px;white-space:nowrap;">
+      <div style="font-size:9px;font-weight:800;color:#5a6a8a;letter-spacing:1.5px;text-transform:uppercase;">Time Travel</div>
+      <div style="font-size:14px;font-weight:800;color:#fff;" id="slider-label">Now</div>
+    </div>
+    <div style="width:1px;height:32px;background:#2a3050;"></div>
+    <div style="display:flex;align-items:center;gap:6px;color:#5a6a8a;font-size:11px;white-space:nowrap;">Oldest</div>
+    <input type="range" id="time-slider" min="0" step="1" value="0" style="flex:1;cursor:pointer;accent-color:#2f6fd4;height:4px;">
+    <div style="color:#5a6a8a;font-size:11px;white-space:nowrap;">Latest</div>
+    <div style="width:1px;height:32px;background:#2a3050;"></div>
+    <div style="display:flex;flex-direction:column;gap:2px;align-items:center;white-space:nowrap;">
+      <div style="font-size:9px;font-weight:800;color:#5a6a8a;letter-spacing:1px;text-transform:uppercase;">Visible</div>
+      <div style="font-size:14px;font-weight:800;color:#2f6fd4;" id="slider-trucks-count">—</div>
+    </div>
+    <button onclick="document.getElementById('time-slider').value=document.getElementById('time-slider').max;updateSlider();" style="padding:8px 16px;border-radius:8px;border:none;background:#2f6fd4;font-size:12px;font-weight:800;color:#fff;cursor:pointer;white-space:nowrap;">Now ›</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// DATA — loaded from API
+// ════════════════════════════════════════
+let allTrucks = [];
+let currentFilter = 'all';
+let currentSearch = '';
+
+// ════════════════════════════════════════
+// API BASE URL — auto detect local vs ngrok
+// ════════════════════════════════════════
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8081'
+  : 'https://hundred-trucks-analysis.onrender.com';
+
+// ════════════════════════════════════════
+// SECTION A — FETCH TRUCK LIST
+// ════════════════════════════════════════
+async function loadTrucks() {
+  try {
+    const res  = await fetch(`${API}/api/hundred-trucks`);
+    const data = await res.json();
+    allTrucks  = data.trucks || [];
+
+    // update header stats
+    document.getElementById('stat-plazas').textContent    = data.total_plazas || '—';
+
+    renderTruckList(allTrucks);
+  } catch(e) {
+    document.getElementById('truck-list').innerHTML =
+      '<div class="loading">Could not connect to server.<br>Make sure server.py is running on port 8080.</div>';
+  }
+}
+
+// ════════════════════════════════════════
+// SECTION B — RENDER TRUCK LIST
+// ════════════════════════════════════════
+function renderTruckList(trucks) {
+  const container = document.getElementById('truck-list');
+  if (!trucks.length) {
+    container.innerHTML = '<div class="loading">No trucks found</div>';
+    return;
+  }
+
+  if (currentFilter === 'connected') {
+    const now = Date.now();
+    container.innerHTML = `
+      <div style="padding:12px 16px;border-bottom:1px solid #f0f4fb;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:13px;font-weight:800;color:#1a1a2e;">Connected Vehicles</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:#1D9E75;display:inline-block;animation:pulse 1.5s infinite;"></span>
+            <span style="font-size:11px;color:#1D9E75;font-weight:700;">Live tracking on</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+          <div style="background:#f0f9f4;border-radius:8px;padding:8px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#1a1a2e;">${trucks.length}</div>
+            <div style="font-size:10px;color:#888;">Connected</div>
+          </div>
+          <div style="background:#f0f9f4;border-radius:8px;padding:8px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#1D9E75;">${trucks.filter(t=>t.crossing_count>0).length}</div>
+            <div style="font-size:10px;color:#888;">Active</div>
+          </div>
+          <div style="background:#f0f9f4;border-radius:8px;padding:8px;text-align:center;">
+            <div style="font-size:16px;font-weight:800;color:#1a1a2e;">1 hr</div>
+            <div style="font-size:10px;color:#888;">Ping interval</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:8px 10px;background:#f8faff;border-radius:8px;display:flex;flex-direction:column;gap:4px;">
+          <span style="font-size:11px;color:#888;">Next ping in <b style="color:#2f6fd4;" id="refresh-countdown">—</b></span>
+          <span style="font-size:11px;color:#888;">Last pinged: <b style="color:#1a9e6e;" id="last-ping-time">${trucks.length > 0 && trucks[0].fetched_at ? new Date((trucks[0].fetched_at+'').replace(' ','T').replace(/Z?$/,'Z')).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '—'}</b></span>
+        </div>
+      </div>
+      ${trucks.map(t => `
+        <div class="truck-item" id="item-${t.vehicle_no}" onclick="selectTruck('${t.vehicle_no}')">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:${t.crossing_count>0?'#1D9E75':'#ccc'};display:inline-block;${t.crossing_count>0?'animation:pulse 1.5s infinite;':''}"></span>
+              <div class="ti-number">${t.vehicle_no}</div>
+            </div>
+            <button onclick="event.stopPropagation();shareTrack('${t.vehicle_no}')" style="display:flex;align-items:center;gap:4px;background:#e8f0fe;color:#1a3a7a;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">
+              Share
+            </button>
+          </div>
+          <div class="ti-owner">${t.owner || 'Unknown owner'}</div>
+          <div class="ti-meta" style="margin-top:6px;">
+            <span class="ti-badge ${t.state === 'KA' ? 'ka' : 'tn'}">${t.state}</span>
+            <span class="ti-badge plazas">${t.unique_plazas} plazas</span>
+            <span class="ti-badge plazas" style="background:#e8f5e9;color:#2e7d32;">${t.crossing_count>0?'On route':'No data'}</span>
+          </div>
+          <div style="font-size:10px;color:#aaa;margin-top:6px;">Last pinged: ${t.fetched_at ? new Date((t.fetched_at+'').replace(' ','T').replace(/Z?$/,'Z')).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '—'}</div>
+        </div>
+      `).join('')}
+    `;
+    return;
+  }
+
+  container.innerHTML = trucks.map(t => `
+    <div class="truck-item" id="item-${t.vehicle_no}" onclick="selectTruck('${t.vehicle_no}')">
+      <div class="ti-number">${t.vehicle_no}</div>
+      <div class="ti-owner">${t.owner || 'Unknown owner'}</div>
+      <div class="ti-meta">
+        <span class="ti-badge ${t.state === 'KA' ? 'ka' : 'tn'}">${t.state}</span>
+        <span class="ti-badge plazas">${t.unique_plazas} plazas</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════
+// SECTION C — FILTER TRUCKS
+// ════════════════════════════════════════
+function filterTrucks(search) {
+  currentSearch = search.toLowerCase();
+  applyFilter();
+}
+
+// countdown to next cron ping (runs at UTC 0:30, 2:30, 4:30 ... = IST 6:00, 8:00, 10:00 ...)
+function startRefreshCountdown() {
+  function update() {
+    const el = document.getElementById('refresh-countdown');
+    const el2 = document.getElementById('lr-next-ping');
+    const now = new Date();
+    // next ping fires at :30 past every hour UTC
+    const next = new Date(now);
+    next.setUTCMinutes(30, 0, 0);
+    if (next <= now) next.setUTCHours(next.getUTCHours() + 1);
+    const diff = Math.max(0, Math.floor((next - now) / 1000));
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    const txt = h > 0 ? `${h} hr ${m} min` : `${m} min ${s} sec`;
+    if (el) el.textContent = txt;
+    if (el2) el2.textContent = `in ${txt}`;
+  }
+  update();
+  setInterval(update, 1000);
+}
+startRefreshCountdown();
+
+function filterState(state, el) {
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = state;
+  applyFilter();
+}
+
+function applyFilter() {
+  let filtered = allTrucks;
+  if (currentFilter === 'connected') filtered = filtered.filter(t => t.is_connected === 1 || t.is_connected === true);
+  else if (currentFilter !== 'all') filtered = filtered.filter(t => t.state === currentFilter);
+  if (currentSearch) filtered = filtered.filter(t =>
+    t.vehicle_no.toLowerCase().includes(currentSearch) ||
+    (t.owner || '').toLowerCase().includes(currentSearch)
+  );
+  renderTruckList(filtered);
+}
+
+// ════════════════════════════════════════
+// SECTION D — SELECT TRUCK & LOAD DETAIL
+// ════════════════════════════════════════
+async function selectTruck(vehicleNo) {
+  // highlight selected
+  document.querySelectorAll('.truck-item').forEach(i => i.classList.remove('active'));
+  const el = document.getElementById('item-' + vehicleNo);
+  if (el) el.classList.add('active');
+
+  // show detail panel
+  document.getElementById('detail-empty').style.display   = 'none';
+  document.getElementById('detail-content').style.display = 'flex';
+
+  // show loading
+  document.getElementById('crossings-body').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:30px;">Loading crossings...</td></tr>';
+
+  try {
+    const res  = await fetch(`${API}/api/hundred-truck-detail?vehicle_no=${vehicleNo}`);
+    const data = await res.json();
+
+    // ── Fill truck info ──
+    const truck = data.truck;
+    document.getElementById('d-truck-no').textContent  = truck.vehicle_no;
+    document.getElementById('d-owner').textContent     = truck.owner || 'Unknown owner';
+    document.getElementById('d-state').textContent     = truck.state + ' State';
+    document.getElementById('d-plazas').textContent    = data.unique_plazas + ' unique plazas';
+    document.getElementById('d-crossings').textContent = data.crossings.length + ' total crossings';
+    document.getElementById('d-date-range').textContent = data.date_from + ' → ' + data.date_to;
+
+    // ── Render all tabs ──
+    renderCrossings(data.crossings);
+    renderPlazas(data.plaza_summary);
+    renderTimeline(data.crossings);
+
+  } catch(e) {
+    document.getElementById('crossings-body').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;color:#e53935;padding:30px;">Error loading data</td></tr>';
+  }
+}
+
+// ════════════════════════════════════════
+// SECTION E — RENDER CROSSINGS TABLE
+// ════════════════════════════════════════
+function renderCrossings(crossings) {
+  const tbody = document.getElementById('crossings-body');
+  tbody.innerHTML = crossings.map((c, i) => `
+    <tr>
+      <td style="color:#aaa;font-size:12px;">${i + 1}</td>
+      <td style="font-weight:600;">${c.plaza}</td>
+      <td style="color:#555;">${c.crossed_at}</td>
+      <td><span class="dir-badge dir-${c.direction}">${c.direction}</span></td>
+      <td style="color:#aaa;font-size:12px;">${parseFloat(c.lat).toFixed(4)}, ${parseFloat(c.lng).toFixed(4)}</td>
+    </tr>
+  `).join('');
+}
+
+// ════════════════════════════════════════
+// SECTION F — RENDER UNIQUE PLAZAS GRID
+// ════════════════════════════════════════
+function renderPlazas(plazas) {
+  document.getElementById('plazas-grid').innerHTML = plazas.map((p, i) => `
+    <div class="plaza-card">
+      <div class="plaza-name">${p.plaza}</div>
+      <div class="plaza-coords">${parseFloat(p.lat).toFixed(4)}, ${parseFloat(p.lng).toFixed(4)}</div>
+      <div class="plaza-count">${p.count} crossing${p.count > 1 ? 's' : ''}</div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════
+// SECTION G — RENDER JOURNEY TIMELINE
+// ════════════════════════════════════════
+let journeyMapInstance = null;
+
+function renderJourneyMap(crossings) {
+  const sorted = [...crossings].sort((a, b) => a.crossed_at.localeCompare(b.crossed_at));
+  const allValid = sorted.filter(c => c.lat && c.lng && parseFloat(c.lat) !== 0 && parseFloat(c.lng) !== 0);
+  // deduplicate: skip repeated plaza if gap < 6 hours (same plaza crossed twice quickly)
+  const validPoints = [];
+  const recentPlaza = new Map();
+  for (const c of allValid) {
+    const t = new Date(c.crossed_at).getTime();
+    const last = recentPlaza.get(c.plaza);
+    if (last && (t - last) < 6 * 60 * 60 * 1000) continue; // skip duplicate within 6h
+    recentPlaza.set(c.plaza, t);
+    validPoints.push(c);
+  }
+  if (validPoints.length < 2) return;
+
+  if (journeyMapInstance) { journeyMapInstance.remove(); journeyMapInstance = null; }
+
+  loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js').then(() => {
+    const map = L.map('journey-map');
+    journeyMapInstance = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 18
+    }).addTo(map);
+
+    const coords = validPoints.map(c => [parseFloat(c.lat), parseFloat(c.lng)]);
+
+
+    // find turnaround by detecting first repeated plaza with min 6-hour gap
+    const plazasSeen = new Map(); // plaza -> first seen time
+    let turnIdx = validPoints.length - 1;
+    for (let i = 0; i < validPoints.length; i++) {
+      const plaza = validPoints[i].plaza;
+      const t = new Date(validPoints[i].crossed_at).getTime();
+      if (plazasSeen.has(plaza)) {
+        const firstTime = plazasSeen.get(plaza);
+        const gapHours = (t - firstTime) / (1000 * 60 * 60);
+        if (gapHours >= 6) { turnIdx = i - 1; break; } // real turnaround
+      } else {
+        plazasSeen.set(plaza, t);
+      }
+    }
+    // if turnaround is at index 0 or 1, ignore it — treat all as outbound
+    if (turnIdx < 2) turnIdx = validPoints.length - 1;
+    const hasReturn = turnIdx >= 2 && turnIdx < validPoints.length - 1;
+
+    // perpendicular offset so lines don't overlap on same road
+    function perpOffset(pts, amount) {
+      return pts.map((c, i) => {
+        let dlat, dlng;
+        if (pts.length === 1) return c;
+        if (i === 0)                 { dlat = pts[1][0]-pts[0][0];     dlng = pts[1][1]-pts[0][1]; }
+        else if (i === pts.length-1) { dlat = pts[i][0]-pts[i-1][0];  dlng = pts[i][1]-pts[i-1][1]; }
+        else                         { dlat = pts[i+1][0]-pts[i-1][0]; dlng = pts[i+1][1]-pts[i-1][1]; }
+        const len = Math.sqrt(dlat*dlat + dlng*dlng) || 1;
+        return [c[0] + (-dlng/len)*amount, c[1] + (dlat/len)*amount];
+      });
+    }
+
+    const OFFSET = 0.025;
+    function perpOffset(pts, amount) {
+      return pts.map((c, i) => {
+        let dlat, dlng;
+        if (pts.length === 1) return c;
+        if (i === 0)                 { dlat = pts[1][0]-pts[0][0];     dlng = pts[1][1]-pts[0][1]; }
+        else if (i === pts.length-1) { dlat = pts[i][0]-pts[i-1][0];  dlng = pts[i][1]-pts[i-1][1]; }
+        else                         { dlat = pts[i+1][0]-pts[i-1][0]; dlng = pts[i+1][1]-pts[i-1][1]; }
+        const len = Math.sqrt(dlat*dlat + dlng*dlng) || 1;
+        return [c[0] + (-dlng/len)*amount, c[1] + (dlat/len)*amount];
+      });
+    }
+
+    const outCoords = perpOffset(coords.slice(0, turnIdx + 1), OFFSET);
+    const retCoords = hasReturn ? perpOffset(coords.slice(turnIdx), -OFFSET) : [];
+
+    // draw outbound blue solid, return orange dashed
+    if (outCoords.length > 1)
+      L.polyline(outCoords, { color:'#2f6fd4', weight:5, opacity:0.9 }).addTo(map);
+    if (retCoords.length > 1)
+      L.polyline(retCoords, { color:'#f57c00', weight:4, opacity:0.9, dashArray:'10,6' }).addTo(map);
+
+    // directional arrows
+    for (let i = 0; i < coords.length - 1; i++) {
+      const isRet = hasReturn && i >= turnIdx;
+      const src = isRet ? retCoords[i - turnIdx] : outCoords[i];
+      const dst = isRet ? retCoords[i - turnIdx + 1] : outCoords[i + 1];
+      if (!src || !dst) continue;
+      const midLat = (src[0]+dst[0])/2, midLng = (src[1]+dst[1])/2;
+      const angle  = Math.atan2(dst[0]-src[0], dst[1]-src[1]) * 180 / Math.PI;
+      L.marker([midLat, midLng], {
+        icon: L.divIcon({ className:'', html:`<div style="transform:rotate(${-angle}deg);font-size:13px;color:#2f6fd4;line-height:1;margin-left:-6px;margin-top:-6px;">➤</div>`, iconAnchor:[0,0] }),
+        interactive: false
+      }).addTo(map);
+    }
+
+    // offset coords for dot placement
+    const offsetCoords = coords.map((c, i) => {
+      if (!hasReturn || i <= turnIdx) return outCoords[i] || c;
+      return retCoords[i - turnIdx] || c;
+    });
+
+    // legend
+    const legend = L.control({ position: 'bottomleft' });
+    legend.onAdd = () => {
+      const d = L.DomUtil.create('div');
+      d.style.cssText = 'background:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-family:Segoe UI,sans-serif;font-size:12px;font-weight:600;';
+      d.innerHTML = `<div style="margin-bottom:6px;color:#555;font-size:11px;font-weight:700;letter-spacing:0.5px;">ROUTE LEGEND</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><div style="width:24px;height:3px;background:#2f6fd4;border-radius:2px;"></div> Outbound</div>
+        ${hasReturn ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><div style="width:20px;border-top:3px dashed #f57c00;"></div> Return</div>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><div style="width:16px;height:16px;border-radius:50%;background:#43a047;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:800;">S</div> Start</div>
+        <div style="display:flex;align-items:center;gap:8px;"><div style="width:16px;height:16px;border-radius:50%;background:#e53935;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:800;">C</div> Current</div>`;
+      return d;
+    };
+    legend.addTo(map);
+
+    // markers — every dot numbered, S and C get plaza label, turnaround gets ↩
+    validPoints.forEach((c, i) => {
+      const isFirst = i === 0, isLast = i === validPoints.length - 1;
+      const isReturn = hasReturn && i > turnIdx;
+      const color = isFirst ? '#43a047' : isLast ? '#e53935' : isReturn ? '#f57c00' : '#2f6fd4';
+      const badge = isFirst ? 'S' : isLast ? 'C' : String(i + 1);
+      const isKey = isFirst || isLast;
+
+      const icon = L.divIcon({
+        className: '',
+        html: isKey
+          ? `<div style="position:relative;width:0;height:0;">
+               <div style="position:absolute;width:26px;height:26px;background:${color};border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 2px ${color};transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;">${badge}</div>
+               <div style="position:absolute;bottom:15px;left:50%;transform:translateX(-50%);background:#fff;padding:4px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.18);font-size:12px;font-weight:700;color:#1a1a2e;white-space:nowrap;border-top:3px solid ${color};">
+                 ${c.plaza}
+               </div>
+             </div>`
+          : `<div style="position:relative;width:0;height:0;">
+               <div style="position:absolute;width:24px;height:24px;background:${color};border-radius:50%;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,0.35);transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;">${i+1}</div>
+             </div>`,
+        iconAnchor: [0, 0]
+      });
+
+      L.marker(offsetCoords[i], { icon }).addTo(map)
+        .bindPopup(`<div style="font-family:'Segoe UI',sans-serif;min-width:200px;">
+          <div style="font-size:13px;font-weight:800;color:#1a1a2e;margin-bottom:6px;border-bottom:1px solid #f0f0f0;padding-bottom:6px;">Stop ${i+1} · ${c.plaza}</div>
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <tr><td style="color:#888;padding:3px 0">Date & Time</td><td style="font-weight:600">${c.crossed_at.substring(0,16)}</td></tr>
+            <tr><td style="color:#888;padding:3px 0">Direction</td><td style="font-weight:600">${c.direction || '—'}</td></tr>
+          </table>
+        </div>`, { maxWidth: 260 });
+    });
+
+    const bounds = L.latLngBounds(coords);
+    window._journeyBounds = bounds;
+    map.fitBounds(bounds, { padding:[50,50], maxZoom:12 });
+    setTimeout(() => {
+      journeyMapInstance.invalidateSize();
+      journeyMapInstance.fitBounds(bounds, { padding:[50,50], maxZoom:12 });
+    }, 400);
+  });
+}
+
+function renderTimeline(crossings) {
+  const sorted = [...crossings].sort((a, b) => a.crossed_at.localeCompare(b.crossed_at));
+  renderJourneyMap(sorted);
+}
+
+// ════════════════════════════════════════
+// SECTION H — TAB SWITCHING
+// ════════════════════════════════════════
+function switchTab(tab, el) {
+  document.querySelectorAll('.dtab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-crossings').style.display = tab === 'crossings' ? 'block' : 'none';
+  document.getElementById('tab-plazas').style.display    = tab === 'plazas'    ? 'block' : 'none';
+  document.getElementById('tab-timeline').style.display  = tab === 'timeline'  ? 'block' : 'none';
+  if (tab === 'timeline' && journeyMapInstance) {
+    setTimeout(() => {
+      journeyMapInstance.invalidateSize();
+      if (window._journeyBounds) journeyMapInstance.fitBounds(window._journeyBounds, { padding: [80, 80] });
+    }, 150);
+  }
+}
+
+// ════════════════════════════════════════
+// SECTION I — MAP VIEW (CLUSTERED)
+// ════════════════════════════════════════
+let mapInstance    = null;
+let mapLoaded      = false;
+let plazaLayer     = null;
+let truckLayer     = null;
+let currentMapLayer = 'plazas';
+
+async function initMap() {
+  if (mapLoaded) { mapInstance && mapInstance.invalidateSize(); return; }
+  mapLoaded = true;
+
+  await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+  await loadScript('https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js');
+
+  const canvasRenderer = L.canvas({ padding: 0.5 });
+  const map = L.map('truck-map', { preferCanvas: true, renderer: canvasRenderer }).setView([13.5, 78.5], 7);
+  mapInstance = map;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 18
+  }).addTo(map);
+
+  await loadPlazaLayer();
+  await loadTruckLayer();
+  preloadAllLocations(); // pre-load all crossings in background for fast slider
+
+  // show plaza layer by default
+  map.addLayer(plazaLayer);
+}
+
+// ── PLAZA LAYER ──
+async function loadPlazaLayer() {
+  const res    = await fetch(`${API}/api/hundred-plazas`);
+  const data   = await res.json();
+  const plazas = data.plazas || [];
+
+  document.getElementById('rpt-total-plazas').textContent = plazas.length;
+
+  const top15    = plazas.slice(0, 15);
+  const maxCount = top15[0]?.truck_count || 1;
+  document.getElementById('rpt-top-plazas').innerHTML = top15.map((p, i) => {
+    const barW  = Math.round((p.truck_count / maxCount) * 100);
+    const color = p.truck_count >= 10 ? '#e53935' : p.truck_count >= 5 ? '#f57c00' : '#1a9e6e';
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+          <span style="font-size:12px;font-weight:600;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:175px;">${i+1}. ${p.plaza}</span>
+          <span style="font-size:11px;font-weight:800;color:${color};margin-left:4px;">${p.truck_count}</span>
+        </div>
+        <div style="background:#f0f4fb;border-radius:4px;height:5px;">
+          <div style="width:${barW}%;background:${color};height:5px;border-radius:4px;"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  plazaLayer = L.markerClusterGroup({ maxClusterRadius: 50 });
+  plazas.forEach(p => {
+    if (!p.lat || !p.lng) return;
+    const color = p.truck_count >= 10 ? '#e53935' : p.truck_count >= 5 ? '#f57c00' : '#1a9e6e';
+    L.circleMarker([p.lat, p.lng], {
+      radius: Math.min(6 + p.truck_count, 16),
+      fillColor: color, color: '#fff', weight: 1.5, opacity: 1, fillOpacity: 0.85
+    }).on('click', () => showPlazaTrucks(p)).addTo(plazaLayer);
+  });
+}
+
+// ── TRUCK LAYER ──
+async function loadTruckLayer() {
+  const res    = await fetch(`${API}/api/hundred-truck-locations`);
+  const data   = await res.json();
+  const trucks = data.trucks || [];
+
+  document.getElementById('rpt-truck-list').innerHTML = trucks.slice(0, 15).map(t => `
+    <div style="margin-bottom:8px;padding:8px 10px;background:#f8faff;border-radius:8px;">
+      <div style="font-size:12px;font-weight:800;color:#1a1a2e;">${t.vehicle_no}</div>
+      <div style="font-size:11px;color:#888;margin-top:2px;">${t.last_plaza}</div>
+      <div style="font-size:10px;color:#aaa;">${t.last_seen}</div>
+    </div>
+  `).join('');
+
+  truckLayer = L.markerClusterGroup({ maxClusterRadius: 60 });
+  trucks.forEach(t => {
+    if (!t.lat || !t.lng) return;
+    const color = t.state === 'KA' ? '#e65100' : '#2f6fd4';
+    L.circleMarker([t.lat, t.lng], {
+      radius: 8, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
+    }).bindPopup(`
+      <b style="font-size:14px;">${t.vehicle_no}</b><br>
+      <span style="color:#555;">${t.owner || 'Unknown owner'}</span><br>
+      <span style="color:#888;font-size:12px;">Last seen: ${t.last_plaza}</span><br>
+      <span style="color:#aaa;font-size:11px;">${t.last_seen}</span>
+    `).addTo(truckLayer);
+  });
+}
+
+// ── PLAZA CLICK — show trucks in right panel ──
+async function showPlazaTrucks(p) {
+  document.getElementById('rpt-plaza-list').style.display   = 'none';
+  document.getElementById('rpt-plaza-detail').style.display = 'block';
+  document.getElementById('rpt-plaza-name').textContent     = `${p.plaza}`;
+  document.getElementById('rpt-plaza-trucks').innerHTML     = '<div style="color:#aaa;font-size:12px;">Loading...</div>';
+
+  const res   = await fetch(`${API}/api/hundred-plaza-detail?plaza=${encodeURIComponent(p.plaza)}`);
+  const data  = await res.json();
+  const trucks = data.trucks || [];
+
+  const revisitors = trucks.filter(t => t.cross_count > 1);
+  const singles    = trucks.filter(t => t.cross_count === 1);
+
+  document.getElementById('rpt-plaza-trucks').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <div style="background:#e3f0ff;border-radius:8px;padding:7px 10px;text-align:center;flex:1;">
+        <div style="font-size:16px;font-weight:900;color:#1565c0;">${trucks.length}</div>
+        <div style="font-size:10px;color:#555;">Trucks</div>
+      </div>
+      <div style="background:#fce4ec;border-radius:8px;padding:7px 10px;text-align:center;flex:1;">
+        <div style="font-size:16px;font-weight:900;color:#c62828;">${p.crossing_count}</div>
+        <div style="font-size:10px;color:#555;">Crossings</div>
+      </div>
+      <div style="background:#fff3e0;border-radius:8px;padding:7px 10px;text-align:center;flex:1;">
+        <div style="font-size:16px;font-weight:900;color:#e65100;">${revisitors.length}</div>
+        <div style="font-size:10px;color:#555;">Revisited</div>
+      </div>
+    </div>
+
+    ${revisitors.length ? `<div style="font-size:11px;font-weight:800;color:#e65100;margin-bottom:6px;text-transform:uppercase;">🔄 Revisited</div>` : ''}
+    ${revisitors.map(t => renderTruckRow(t)).join('')}
+
+    ${singles.length ? `<div style="font-size:11px;font-weight:800;color:#888;margin:10px 0 6px;text-transform:uppercase;">✅ Passed Once</div>` : ''}
+    ${singles.map(t => renderTruckRow(t)).join('')}
+  `;
+}
+
+function renderTruckRow(t) {
+  const bgColor = t.vehicle_no.startsWith('TN') ? '#e3f0ff' : '#fff3e0';
+  const txColor = t.vehicle_no.startsWith('TN') ? '#1565c0' : '#e65100';
+  const revisit = t.cross_count > 1;
+  return `
+    <div style="background:#f8faff;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;background:${bgColor};color:${txColor};">${t.vehicle_no}</span>
+        <span style="font-size:11px;font-weight:800;color:${revisit ? '#e65100' : '#1a9e6e'};">${t.cross_count}× ${revisit ? '🔄' : '✅'}</span>
+      </div>
+      <div style="font-size:10px;color:#888;">${t.owner || ''}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px;">
+        First: ${t.first_cross.substring(0,16)} ${t.cross_count > 1 ? `· Last: ${t.last_cross.substring(0,16)}` : ''}
+      </div>
+    </div>`;
+}
+
+function closePlazaDetail() {
+  document.getElementById('rpt-plaza-detail').style.display = 'none';
+  document.getElementById('rpt-plaza-list').style.display   = 'block';
+}
+
+// ── LAYER TOGGLE ──
+function switchLayer(layer) {
+  if (!mapInstance || !plazaLayer || !truckLayer) return;
+  currentMapLayer = layer;
+
+  const isPlaza = layer === 'plazas';
+  if (isPlaza) { mapInstance.addLayer(plazaLayer);  mapInstance.removeLayer(truckLayer); }
+  else         { mapInstance.addLayer(truckLayer);  mapInstance.removeLayer(plazaLayer); }
+
+  document.getElementById('report-plazas').style.display = isPlaza ? 'block' : 'none';
+  document.getElementById('report-trucks').style.display = isPlaza ? 'none'  : 'block';
+
+  document.getElementById('toggle-plazas').style.background = isPlaza ? '#2f6fd4' : '#f0f4fb';
+  document.getElementById('toggle-plazas').style.color      = isPlaza ? '#fff'    : '#888';
+  document.getElementById('toggle-trucks').style.background = isPlaza ? '#f0f4fb' : '#2f6fd4';
+  document.getElementById('toggle-trucks').style.color      = isPlaza ? '#888'    : '#fff';
+
+  // show slider only on trucks view
+  const sliderBar = document.getElementById('map-slider-bar');
+  sliderBar.style.display = isPlaza ? 'none' : 'flex';
+  if (!isPlaza) {
+    preloadAllLocations().then(() => initSlider());
+  }
+}
+
+// ── TIME TRAVEL SLIDER ──
+let sliderTicks = [];
+let sliderTruckLayer = null;
+let allCrossingsCache = null; // pre-loaded all truck locations
+
+async function preloadAllLocations() {
+  if (allCrossingsCache) return;
+  const res = await fetch(`${API}/api/hundred-all-crossings`);
+  const data = await res.json();
+  allCrossingsCache = data.crossings || [];
+}
+
+async function initSlider() {
+  if (sliderTicks.length > 0) return;
+
+  const res  = await fetch(`${API}/api/hundred-truck-locations`);
+  const data = await res.json();
+  const times = (data.trucks || []).map(t => t.last_seen).filter(Boolean).sort();
+  if (!times.length) return;
+
+  // build 6-hour ticks from earliest crossing to now
+  const start = new Date(times[0]);
+  start.setMinutes(0, 0, 0);
+  // round down to nearest 6h
+  start.setHours(Math.floor(start.getHours() / 6) * 6);
+  const end = new Date();
+
+  sliderTicks = [];
+  let cur = new Date(start);
+  while (cur <= end) {
+    sliderTicks.push(new Date(cur));
+    cur = new Date(cur.getTime() + 6 * 3600 * 1000);
+  }
+  sliderTicks.push(new Date(end)); // add "now" as last tick
+
+  const slider = document.getElementById('time-slider');
+  slider.min   = 0;
+  slider.max   = sliderTicks.length - 1;
+  slider.value = sliderTicks.length - 1; // default = now
+  let sliderTimer = null;
+  slider.oninput = () => {
+    const idx = parseInt(slider.value);
+    const tick = sliderTicks[idx];
+    const isNow = idx === sliderTicks.length - 1;
+    const label = isNow ? 'Now' : tick.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true});
+    document.getElementById('slider-label').textContent = label;
+    document.getElementById('last-seen-header').textContent = isNow ? 'Last Seen' : `Last seen at: ${label}`;
+    clearTimeout(sliderTimer);
+    sliderTimer = setTimeout(updateSlider, 300);
+  };
+  updateSlider();
+}
+
+async function updateSlider() {
+  const slider = document.getElementById('time-slider');
+  const idx    = parseInt(slider.value);
+  const tick   = sliderTicks[idx];
+  if (!tick || !mapInstance) return;
+
+  const isNow = idx === sliderTicks.length - 1;
+  const label = isNow ? 'Now (latest)' :
+    tick.toLocaleDateString('en-IN', { day:'numeric', month:'short' }) + ' · ' +
+    tick.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
+
+  document.getElementById('slider-label').textContent = label;
+  document.getElementById('last-seen-header').textContent = isNow ? 'Last Seen' : `Last seen at: ${label}`;
+
+  const atStr = tick.getFullYear() + '-' +
+    String(tick.getMonth()+1).padStart(2,'0') + '-' +
+    String(tick.getDate()).padStart(2,'0') + ' ' +
+    String(tick.getHours()).padStart(2,'0') + ':59:59';
+
+  // use cache if available, otherwise fall back to API
+  let trucks = [];
+  if (allCrossingsCache) {
+    const byTruck = {};
+    for (const c of allCrossingsCache) {
+      if (c.crossed_at <= atStr) {
+        if (!byTruck[c.vehicle_no] || c.crossed_at > byTruck[c.vehicle_no].crossed_at) {
+          byTruck[c.vehicle_no] = c;
+        }
+      }
+    }
+    trucks = Object.values(byTruck).filter(c => c.lat && c.lat !== 0).map(c => ({
+      vehicle_no: c.vehicle_no, owner: c.owner, state: c.state,
+      last_plaza: c.plaza, lat: c.lat, lng: c.lng, last_seen: c.crossed_at
+    }));
+  } else {
+    const res  = await fetch(`${API}/api/hundred-truck-locations-at?at=${encodeURIComponent(atStr)}`);
+    const data = await res.json();
+    trucks = data.trucks || [];
+  }
+
+  document.getElementById('slider-trucks-count').textContent = `${trucks.length} trucks visible`;
+
+  // update right panel list
+  document.getElementById('rpt-truck-list').innerHTML = trucks.slice(0, 15).map(t => `
+    <div style="margin-bottom:8px;padding:8px 10px;background:#f8faff;border-radius:8px;">
+      <div style="font-size:12px;font-weight:800;color:#1a1a2e;">${t.vehicle_no}</div>
+      <div style="font-size:11px;color:#888;margin-top:2px;">${t.last_plaza}</div>
+      <div style="font-size:10px;color:#aaa;">${t.last_seen ? t.last_seen.substring(0,16) : '—'}</div>
+    </div>
+  `).join('');
+
+  // remove old layers
+  if (sliderTruckLayer) mapInstance.removeLayer(sliderTruckLayer);
+  if (truckLayer && mapInstance.hasLayer(truckLayer)) mapInstance.removeLayer(truckLayer);
+
+  // build new layer with clustering
+  sliderTruckLayer = L.markerClusterGroup({ maxClusterRadius: 40, chunkedLoading: true });
+  trucks.forEach(t => {
+    if (!t.lat || !t.lng) return;
+    const color = t.state === 'KA' ? '#e65100' : '#2f6fd4';
+    L.circleMarker([t.lat, t.lng], {
+      radius: 7, fillColor: color, color: '#fff', weight: 2,
+      opacity: 1, fillOpacity: 0.9
+    }).bindPopup(`
+      <div style="font-family:'Segoe UI',sans-serif;min-width:210px;">
+        <div style="background:#2f6fd4;color:#fff;padding:6px 10px;border-radius:6px 6px 0 0;font-size:11px;font-weight:700;margin:-1px -1px 8px -1px;">
+          Position as of: ${label}
+        </div>
+        <b style="font-size:14px;">${t.vehicle_no}</b><br>
+        <span style="color:#555;">${t.owner || 'Unknown owner'}</span><br>
+        <span style="color:#888;font-size:12px;margin-top:4px;display:block;">${t.last_plaza}</span>
+        <span style="color:#aaa;font-size:11px;">Last crossing: ${t.last_seen ? t.last_seen.substring(0,16) : '—'}</span>
+      </div>
+    `).addTo(sliderTruckLayer);
+  });
+
+  mapInstance.addLayer(sliderTruckLayer);
+}
+
+function loadScript(src) {
+  return new Promise(resolve => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve;
+    document.head.appendChild(s);
+  });
+}
+
+// ════════════════════════════════════════
+// SECTION J — VIEW SWITCHER
+// ════════════════════════════════════════
+function showView(view) {
+  document.querySelector('.layout').style.display            = view === 'trucks'     ? 'flex' : 'none';
+  document.getElementById('map-view').style.display          = view === 'map'        ? 'flex' : 'none';
+  document.getElementById('routes-view').style.display       = view === 'routes'     ? 'flex' : 'none';
+  document.getElementById('report-view').style.display       = view === 'report'     ? 'flex' : 'none';
+  document.getElementById('liveroutes-view').style.display   = view === 'liveroutes'  ? 'flex' : 'none';
+  document.getElementById('credittrips-view').style.display  = view === 'credittrips' ? 'flex' : 'none';
+
+  const btns = { trucks: 'btn-trucks', map: 'btn-map', routes: 'btn-routes', report: 'btn-report', liveroutes: 'btn-liveroutes', credittrips: 'btn-credittrips' };
+  Object.entries(btns).forEach(([v, id]) => {
+    const btn = document.getElementById(id);
+    const active = v === view;
+    btn.style.background  = active ? '#fff' : 'transparent';
+    btn.style.color       = active ? '#1a3a7a' : '#fff';
+    btn.style.borderColor = active ? '#fff' : 'rgba(255,255,255,0.4)';
+  });
+
+  if (view === 'map')          initMap();
+  if (view === 'routes')       initRoutes();
+  if (view === 'report')       initReport();
+  if (view === 'liveroutes')   initLiveRoutes();
+  if (view === 'credittrips')  initCreditTrips();
+}
+
+// ════════════════════════════════════════
+// SECTION L — PLAZA REPORT
+// ════════════════════════════════════════
+let allPlazaReport = [];
+
+async function initReport() {
+  if (allPlazaReport.length) return;
+  const res  = await fetch(`${API}/api/hundred-plaza-report`);
+  const data = await res.json();
+  allPlazaReport = data.plazas || [];
+  renderReport(allPlazaReport);
+}
+
+function filterReport(search) {
+  const q = search.toLowerCase();
+  const filtered = q ? allPlazaReport.filter(p => p.plaza.toLowerCase().includes(q)) : allPlazaReport;
+  renderReport(filtered);
+}
+
+function renderReport(plazas) {
+  const max = plazas[0]?.truck_count || 1;
+  document.getElementById('report-list').innerHTML = plazas.map((p, i) => {
+    const barW = Math.round((p.truck_count / max) * 100);
+    const color = p.truck_count >= 10 ? '#e53935' : p.truck_count >= 5 ? '#f57c00' : '#1a9e6e';
+    const chips = p.trucks.map(v =>
+      `<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;background:#f4f6fb;color:#555;display:inline-block;margin:2px 3px 2px 0;">${v}</span>`
+    ).join('');
+    return `
+      <div style="background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:10px;border:1px solid #e8edf5;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:800;color:#1a1a2e;flex:1;">${p.plaza}</div>
+          <div style="font-size:13px;font-weight:900;color:${color};">${p.truck_count} truck${p.truck_count > 1 ? 's' : ''}</div>
+        </div>
+        <div style="background:#f0f4fb;border-radius:4px;height:5px;margin-bottom:10px;">
+          <div style="width:${barW}%;background:${color};height:5px;border-radius:4px;"></div>
+        </div>
+        <div style="line-height:1.6;">${chips}</div>
+      </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+// SECTION K — ALL ROUTES VIEW
+// ════════════════════════════════════════
+let allRoutes = [];
+
+async function initRoutes() {
+  if (allRoutes.length) return; // already loaded
+  const res  = await fetch(`${API}/api/hundred-routes`);
+  const data = await res.json();
+  allRoutes  = data.routes || [];
+  renderRoutes(allRoutes);
+}
+
+function filterRoutes(state) {
+  ['all','tn','ka'].forEach(s => {
+    const btn = document.getElementById('rf-' + s);
+    const active = s === state.toLowerCase();
+    btn.style.background  = active ? '#2f6fd4' : '#fff';
+    btn.style.color       = active ? '#fff'    : '#888';
+    btn.style.borderColor = active ? '#2f6fd4' : '#dde3ee';
+  });
+  const filtered = state === 'all' ? allRoutes : allRoutes.filter(r => r.state === state);
+  renderRoutes(filtered);
+}
+
+async function shareTrack(vehicleNo) {
+  const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `http://localhost:8081/track.html`
+    : `https://hundred-trucks-analysis.onrender.com/track.html`;
+  // get token from server so truck number is never in the URL
+  let token = '';
+  try {
+    const r = await fetch(`${API}/api/make-token?vehicle_no=${vehicleNo}`);
+    const d = await r.json();
+    token = d.token || '';
+  } catch(e) {}
+  const link = token ? `${baseUrl}?token=${token}` : `${baseUrl}?truck=${vehicleNo}`;
+
+  // try to get pickup/drop city from already-loaded trip data
+  let fromCity = '', toCity = '';
+  if (lrLastTruckData) {
+    const td = lrLastTruckData.find(t => t.truck.vehicle_no === vehicleNo);
+    if (td?.tripInfo) {
+      const pickup = td.tripInfo.pincode;
+      const drop   = td.tripInfo.dropPincode;
+      fromCity = pickup ? (lrCityCache[pickup] || pickup) : '';
+      toCity   = drop   ? (lrCityCache[drop]   || drop)  : '';
+    }
+  }
+  const routeLine = fromCity && toCity ? `*Route:* ${fromCity} → ${toCity}\n\n` : '';
+
+  const msg  = `Hey there!\n\nYour shipment is on its way.\n\n*Truck No:* ${vehicleNo}\n${routeLine}Track your live route here:\n${link}\n\n_For any queries, feel free to reach out._\n\nHave a nice day!\n*Mirchi-Lime*`;
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+
+  // Show popup
+  const popup = document.createElement('div');
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  popup.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+      <div style="font-size:32px;margin-bottom:12px;"></div>
+      <div style="font-size:16px;font-weight:900;color:#1a1a2e;margin-bottom:6px;">Share Tracking Link</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px;">Truck: <b>${vehicleNo}</b></div>
+      <div style="background:#f0f4ff;border-radius:10px;padding:10px 14px;font-size:11px;color:#555;word-break:break-all;margin-bottom:16px;text-align:left;">${link}</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <button onclick="navigator.clipboard.writeText('${link}').then(()=>{this.textContent='Copied!'})"
+          style="flex:1;padding:10px;background:#e8f0fe;color:#1a3a7a;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
+          Copy Link
+        </button>
+        <a href="${waUrl}" target="_blank"
+          style="flex:1;padding:10px;background:#e0f5e9;color:#1a7a3a;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+          WhatsApp
+        </a>
+      </div>
+      <button onclick="this.closest('div[style*=fixed]').remove()"
+        style="width:100%;padding:10px;background:#f5f5f5;color:#888;border:none;border-radius:10px;font-size:13px;cursor:pointer;">
+        Close
+      </button>
+    </div>`;
+  document.body.appendChild(popup);
+  popup.onclick = e => { if (e.target === popup) popup.remove(); };
+}
+
+function toggleRoute(card) {
+  const collapsed = card.querySelector('.route-collapsed');
+  const expanded  = card.querySelector('.route-expanded');
+  const isOpen    = expanded.style.display === 'block';
+  collapsed.style.display = isOpen ? 'block' : 'none';
+  expanded.style.display  = isOpen ? 'none'  : 'block';
+}
+
+function renderRoutes(routes) {
+  document.getElementById('routes-list').innerHTML = routes.map((r, i) => {
+    const plazas   = r.plazas;
+    const first    = plazas[0] || '—';
+    const last     = plazas[plazas.length - 1] || '—';
+    const middle   = plazas.slice(1, -1);
+    const stateColor = r.state === 'KA' ? '#e65100' : '#1565c0';
+    const stateBg    = r.state === 'KA' ? '#fff3e0' : '#e3f0ff';
+
+    // show up to 5 middle plazas with arrows
+    const shown  = middle.slice(0, 5);
+    const hasMore = middle.length > 5;
+    const route  = [first, ...shown, last].join(' <span style="color:#ccc;">→</span> ');
+    const allRoute = plazas.join(' <span style="color:#ccc;">→</span> ');
+
+    return `
+      <div style="background:#fff;border-radius:12px;padding:14px 18px;margin-bottom:10px;border:1px solid #e8edf5;cursor:pointer;" onclick="toggleRoute(this)">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="width:28px;height:28px;background:#f4f6fb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#888;flex-shrink:0;">${i+1}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:14px;font-weight:800;color:#1a1a2e;">${r.vehicle_no}</span>
+              <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${stateBg};color:${stateColor};">${r.state}</span>
+              <span style="font-size:11px;color:#aaa;">${r.owner}</span>
+            </div>
+            <div class="route-collapsed" style="font-size:13px;color:#444;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${route}${hasMore ? ' <span style="color:#2f6fd4;font-size:11px;font-weight:700;">+' + (middle.length - 5) + ' more ▼</span>' : ''}</div>
+            <div class="route-expanded" style="display:none;font-size:13px;color:#444;line-height:1.8;white-space:normal;">${allRoute} <span style="color:#2f6fd4;font-size:11px;font-weight:700;">▲ collapse</span></div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:11px;font-weight:700;color:#6a1b9a;">${r.unique_count} plazas</div>
+            <div style="font-size:10px;color:#1a1a2e;margin-top:2px;">${r.first_seen} → ${r.last_seen}</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+loadTrucks();
+setInterval(loadTrucks, 1 * 60 * 60 * 1000);
+
+// ════════════════════════════════════════
+// LIVE ROUTES
+// ════════════════════════════════════════
+const TRUCK_COLORS = [
+  '#e74c3c','#3498db','#f39c12','#9b59b6','#1abc9c','#e91e8c',
+  '#e67e22','#27ae60','#2980b9','#8e44ad','#16a085','#c0392b',
+  '#d35400','#2c3e50','#7f8c8d','#f1c40f','#1dd1a1','#ff6b6b',
+  '#a29bfe','#fd79a8','#00b894','#6c5ce7','#0984e3','#e17055'
+];
+let liveRoutesMap = null;
+const lrGeocodeCache = {};
+const lrCityCache    = {};
+const lrRevGeoCache  = {};
+let lrActiveTruck = null;
+let lrLastTruckData = null;
+
+async function pingTruck(vno, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ Pinging...';
+  try {
+    const r = await fetch(`${API}/api/ping-truck?vehicle_no=${vno}`);
+    const d = await r.json();
+    if (d.error) {
+      btn.textContent = '✗ Error';
+      btn.style.color = '#e74c3c';
+    } else {
+      btn.textContent = `✓ ${d.new} new`;
+      btn.style.color = '#1a7a3a';
+      if (d.new > 0) setTimeout(() => loadLiveRoutes(), 1000);
+    }
+  } catch(e) {
+    btn.textContent = '✗ Failed';
+    btn.style.color = '#e74c3c';
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Ping now'; btn.style.color = '#444'; }, 4000);
+}
+
+function lrFilterTruck(vno) {
+  lrActiveTruck = (lrActiveTruck === vno) ? null : vno;
+  document.querySelectorAll('.lr-truck-card').forEach(el => {
+    const active = !lrActiveTruck || el.dataset.vno === lrActiveTruck;
+    el.style.opacity = active ? '1' : '0.35';
+    el.style.outline = (!lrActiveTruck || el.dataset.vno !== lrActiveTruck) ? 'none' : '2px solid #2f6fd4';
+  });
+  if (lrLastTruckData) lrDrawMarkers(lrLastTruckData, lrActiveTruck);
+}
+
+async function initLiveRoutes() {
+  if (liveRoutesMap) { liveRoutesMap.invalidateSize(); loadLiveRoutes().catch(console.error); return; }
+
+  await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+
+  liveRoutesMap = L.map('live-routes-map').setView([18, 78], 5);
+  L.tileLayer('https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png', {
+    attribution: '© Stadia Maps © OpenStreetMap contributors', maxZoom: 20
+  }).addTo(liveRoutesMap);
+
+  const mapLegend = L.control({ position: 'bottomright' });
+  mapLegend.onAdd = () => {
+    const d = L.DomUtil.create('div');
+    d.style.cssText = 'background:rgba(255,255,255,0.92);padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.8;box-shadow:0 2px 6px rgba(0,0,0,0.15);';
+    d.innerHTML = `
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#e05c2e" stroke="#fff" stroke-width="2"/></svg>
+        <span style="color:#444;">Starting point</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><rect x="1" y="1" width="16" height="16" fill="#2f6fd4" stroke="#fff" stroke-width="2" transform="rotate(45 9 9)"/></svg>
+        <span style="color:#444;">Current position</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="18" height="22" viewBox="0 0 18 22"><circle cx="9" cy="9" r="8" fill="#e05c2e" stroke="#fff" stroke-width="2"/><line x1="9" y1="17" x2="9" y2="22" stroke="#222" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <span style="color:#444;">Destination</span>
+      </div>`;
+    return d;
+  };
+  mapLegend.addTo(liveRoutesMap);
+
+  loadLiveRoutes().catch(e => console.error('loadLiveRoutes error:', e));
+  setInterval(() => loadLiveRoutes().catch(e => console.error(e)), 1 * 60 * 60 * 1000);
+}
+
+async function loadLiveRoutes() {
+  // get all connected trucks
+  const res   = await fetch(`${API}/api/hundred-trucks`);
+  const data  = await res.json();
+  const connected = (data.trucks || []).filter(t => t.is_connected === 1 || t.is_connected === true);
+
+  // clear old layers
+  lrActiveTruck = null;
+
+  const legend = document.getElementById('lr-legend');
+  const cards  = document.getElementById('lr-truck-cards');
+  legend.innerHTML = '';
+  cards.innerHTML  = '';
+
+  // Show last ping time from most recently fetched connected truck
+  const lastPinged = connected.map(t => t.fetched_at).filter(Boolean).sort().pop();
+  if (lastPinged) {
+    document.getElementById('lr-last-ping').textContent =
+      new Date((lastPinged+'').replace(' ','T').replace(/Z?$/,'Z')).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+  }
+
+  const START_DATE = '2026-07-01 00:00:00';
+
+  // fetch enroute trips to get pickup pincodes, reporting time, and loading point
+  const enrouteMap = {}; // truck_number -> { pincode, dropPincode, startTime, loadingPoint, reportingTime }
+  try {
+    const eRes  = await fetch(`${API}/api/enroute-trips`);
+    const eData = await eRes.json();
+    (eData.result?.data || []).forEach(t => {
+      const points = t.loading_points || [];
+      const lp = points[0] || {};
+      const rtRaw = lp.reporting_time;
+      const rtStr = typeof rtRaw === 'object' && rtRaw ? (rtRaw.SQLTime || '') : (rtRaw || '');
+      let startTime = null;
+      if (lp.reporting_date && rtStr) {
+        startTime = new Date(`${lp.reporting_date}T${rtStr}`);
+      }
+      enrouteMap[t.truck_number.trim()] = {
+        pincode:       t.pickup_pincode,
+        dropPincode:   t.drop_pincode || '',
+        startTime,
+        loadingPoint:  lp.loading_point || '',
+        reportingTime: rtStr,
+        reportingDate: lp.reporting_date || '',
+      };
+    });
+  } catch(e) {}
+
+  // fetch all truck details in parallel
+  const truckData = await Promise.all(connected.map(async (truck, i) => {
+    const color = TRUCK_COLORS[i % TRUCK_COLORS.length];
+    try {
+      const r = await fetch(`${API}/api/hundred-truck-detail?vehicle_no=${truck.vehicle_no}`);
+      const d = await r.json();
+      const crossings = (d.crossings || []).filter(c => c.lat && c.lat !== 0);
+      return { truck, color, crossings, tripInfo: enrouteMap[truck.vehicle_no] };
+    } catch(e) {
+      return { truck, color, crossings: [], tripInfo: enrouteMap[truck.vehicle_no] };
+    }
+  }));
+
+  // reverse geocode last positions to get city names
+  const revCache = lrRevGeoCache;
+  await Promise.all(truckData.map(async ({ crossings }) => {
+    const last = crossings[crossings.length - 1];
+    if (!last || !last.lat || !last.lng) return;
+    const key = `${last.lat.toFixed(2)},${last.lng.toFixed(2)}`;
+    if (revCache[key]) return;
+    try {
+      const g = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${last.lat}&lon=${last.lng}&format=json`);
+      const j = await g.json();
+      const a = j.address || {};
+      revCache[key] = [
+        a.city || a.town || a.village || a.county || '',
+        a.state || ''
+      ].filter(Boolean).join(', ') || j.display_name?.split(',').slice(0,2).join(', ') || '';
+    } catch(e) {}
+  }));
+
+  // build legend
+  truckData.forEach(({ truck, color }) => {
+    legend.innerHTML += `<div style="display:flex;align-items:center;gap:5px;background:#f8faff;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;">
+      <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;"></span>
+      ${truck.vehicle_no}
+    </div>`;
+  });
+
+  // geocode all unique pincodes (origin + drop) — cache per pincode
+  // use module-level cache (lrGeocodeCache / lrCityCache) so geocoding survives refreshes
+  const geocodeCache = lrGeocodeCache;
+  const cityCache    = lrCityCache;
+
+  async function geocodePin(pin) {
+    if (!pin || geocodeCache[pin]) return;
+    try {
+      const gRes  = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${pin}&countrycodes=in&format=json&limit=1`);
+      const gData = await gRes.json();
+      if (gData.length > 0) {
+        geocodeCache[pin] = [parseFloat(gData[0].lat), parseFloat(gData[0].lon)];
+        // extract city from display_name (first part before comma)
+        const parts = gData[0].display_name.split(',');
+        cityCache[pin] = parts[1]?.trim() || parts[0]?.trim() || pin;
+      }
+    } catch(e) {}
+  }
+
+  // draw trucks immediately with current positions, geocode origins/destinations in background
+  const allPins = new Set();
+  truckData.forEach(td => { if (td.tripInfo) { allPins.add(td.tripInfo.pincode); allPins.add(td.tripInfo.dropPincode); } });
+  // start geocoding in background — don't await
+  await Promise.all([...allPins].filter(Boolean).map(geocodePin));
+
+  // build side cards (after geocoding so drop coords are available for "Reached destination")
+  truckData.forEach(({ truck, color, crossings, tripInfo }) => {
+    const last = crossings[crossings.length - 1];
+    const locKey = last && last.lat ? `${last.lat.toFixed(2)},${last.lng.toFixed(2)}` : null;
+    const cityName = locKey && revCache[locKey] ? revCache[locKey] : null;
+
+    // departure time from reporting_time
+    let departHtml = '';
+    if (tripInfo?.reportingDate && tripInfo?.reportingTime) {
+      const dt = new Date(`${tripInfo.reportingDate}T${tripInfo.reportingTime}`);
+      const fmt = dt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+      departHtml = `<div style="font-size:10px;color:#555;margin-top:4px;">Departs: ${fmt}</div>`;
+    }
+
+    // collect load from loading point — use crossing nearest to pickup pincode coord
+    let collectHtml = '';
+    if (tripInfo?.loadingPoint) {
+      let collectDateStr = '';
+      const originCoord = tripInfo.pincode ? geocodeCache[tripInfo.pincode] : null;
+      if (originCoord && crossings.length > 0) {
+        let nearest = null, minDist = Infinity;
+        crossings.forEach(c => {
+          const d = Math.abs(c.lat - originCoord[0]) + Math.abs(c.lng - originCoord[1]);
+          if (d < minDist) { minDist = d; nearest = c; }
+        });
+        if (nearest) {
+          const dt = new Date(nearest.crossed_at.replace(' ', 'T') + '+05:30');
+          const day = dt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' });
+          const tim = dt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+          collectDateStr = ` on ${day} at ${tim}`;
+        }
+      }
+      collectHtml = `<div style="font-size:10px;color:#1a4a8a;margin-top:3px;font-weight:600;">Collected from ${tripInfo.loadingPoint}${collectDateStr}</div>`;
+    }
+
+    // reached destination — compare last crossing to drop pincode coord
+    let arrivedHtml = '';
+    if (last && tripInfo?.dropPincode) {
+      const dropCoord = geocodeCache[tripInfo.dropPincode];
+      if (dropCoord) {
+        const dist = Math.abs(last.lat - dropCoord[0]) + Math.abs(last.lng - dropCoord[1]);
+        if (dist < 0.15) {
+          const dt = new Date(last.crossed_at.replace(' ','T') + '+05:30');
+          const fmt = dt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+          arrivedHtml = `<div style="font-size:10px;color:#1a7a3a;font-weight:700;margin-top:4px;">Reached destination &nbsp;·&nbsp;${fmt}</div>`;
+        }
+      }
+    }
+
+    cards.innerHTML += `
+      <div class="lr-truck-card" data-vno="${truck.vehicle_no}" onclick="lrFilterTruck('${truck.vehicle_no}')"
+        style="margin-bottom:12px;padding:10px;border-radius:10px;border-left:4px solid ${color};background:#f8faff;cursor:pointer;transition:opacity 0.2s,outline 0.2s;">
+        <div style="font-size:12px;font-weight:800;color:#1a1a2e;display:flex;align-items:center;gap:5px;">
+          ${truck.vehicle_no}
+          ${(() => {
+            if (!last) return '';
+            const hrs = (Date.now() - new Date(last.crossed_at.replace(' ','T')+'Z').getTime()) / 3600000;
+            if (hrs >= 4) return `<svg title="No movement 4+ hours" width="14" height="16" viewBox="0 0 14 16" style="vertical-align:middle;"><line x1="2" y1="1" x2="2" y2="15" stroke="#e74c3c" stroke-width="1.8" stroke-linecap="round"/><polygon points="2,1 13,5 2,9" fill="#e74c3c"/></svg>`;
+            if (hrs >= 2) return `<svg title="No movement 2+ hours" width="14" height="16" viewBox="0 0 14 16" style="vertical-align:middle;"><line x1="2" y1="1" x2="2" y2="15" stroke="#f39c12" stroke-width="1.8" stroke-linecap="round"/><polygon points="2,1 13,5 2,9" fill="#f39c12"/></svg>`;
+            return `<span title="Moving" style="width:9px;height:9px;border-radius:50%;background:#2ecc71;display:inline-block;vertical-align:middle;"></span>`;
+          })()}
+        </div>
+        ${departHtml}
+        ${cityName ? `<div style="font-size:12px;font-weight:700;color:#1a3a7a;margin-top:4px;">${cityName}</div>` : ''}
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">${last ? last.plaza : '—'}</div>
+        <div style="font-size:10px;color:#aaa;margin-top:1px;">${last ? new Date(last.crossed_at.replace(' ','T')+'Z').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '—'}</div>
+        <div style="font-size:10px;color:#1a9e6e;margin-top:3px;font-weight:700;">${crossings.length} crossings</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">Last ping: ${truck.fetched_at ? new Date((truck.fetched_at+'').replace(' ','T').replace(/Z?$/,'Z')).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '—'}</div>
+        ${collectHtml}
+        ${arrivedHtml}
+
+      </div>`;
+  });
+
+  // draw each truck route
+
+  lrLastTruckData = truckData;
+  lrDrawMarkers(truckData, null);
+}
+
+function lrDrawMarkers(truckData, filterVno) {
+  const geocodeCache = lrGeocodeCache;
+  const cityCache    = lrCityCache;
+
+  // clear existing markers/polylines
+  liveRoutesMap.eachLayer(l => { if (l instanceof L.Polyline || l instanceof L.CircleMarker || l instanceof L.Marker) liveRoutesMap.removeLayer(l); });
+
+  const visibleData = filterVno ? truckData.filter(td => td.truck.vehicle_no === filterVno) : truckData;
+  const allBounds = [];
+  const currentGroups = {};
+  const originGroups  = {};
+
+  for (const td of visibleData) {
+    const { truck, color, crossings, tripInfo } = td;
+    const last = crossings[crossings.length - 1];
+    const originPin    = tripInfo?.pincode;
+    const dropPin      = tripInfo?.dropPincode;
+    const originCoord  = originPin && geocodeCache[originPin] ? geocodeCache[originPin] : null;
+    const dropCoord    = dropPin   && geocodeCache[dropPin]   ? geocodeCache[dropPin]   : null;
+    const currentCoord = last ? [last.lat, last.lng] : null;
+
+    // dashed route
+    const plazaCoords = crossings.map(c => [c.lat, c.lng]);
+    const routePts = [...(originCoord ? [originCoord] : []), ...plazaCoords];
+    if (routePts.length > 1) {
+      L.polyline(routePts, { color, weight: 3, opacity: 0.85, dashArray: '6 10' }).addTo(liveRoutesMap);
+      routePts.forEach(c => allBounds.push(c));
+    }
+
+    // group current positions by coord key
+    if (currentCoord) {
+      const key = `${last.lat.toFixed(3)},${last.lng.toFixed(3)}`;
+      if (!currentGroups[key]) currentGroups[key] = { coord: currentCoord, trucks: [] };
+      currentGroups[key].trucks.push({ truck, color, last, dropCity: dropPin ? (cityCache[dropPin] || dropPin) : '' });
+      allBounds.push(currentCoord);
+    }
+
+    // destination pin
+    if (dropCoord) {
+      L.marker(dropCoord, {
+        icon: L.divIcon({
+          className: '',
+          html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28" viewBox="0 0 24 28">
+            <circle cx="12" cy="10" r="9" fill="${color}" stroke="#fff" stroke-width="2.5"/>
+            <line x1="12" y1="19" x2="12" y2="27" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>`,
+          iconAnchor: [12, 27], iconSize: [24, 28],
+        })
+      }).bindPopup(`<b>Destination</b><br>${cityCache[dropPin] || dropPin}`).addTo(liveRoutesMap);
+      allBounds.push(dropCoord);
+    }
+
+    // group origins by pincode for pie
+    const opin = originPin || ('_' + truck.vehicle_no);
+    if (originCoord) {
+      if (!originGroups[opin]) originGroups[opin] = { coords: originCoord, city: cityCache[originPin] || originPin || '?', trucks: [] };
+      originGroups[opin].trucks.push({ truck, color, tripInfo });
+    }
+  }
+
+  // draw origin circles — pie if multiple trucks, solid if one
+  for (const [opin, group] of Object.entries(originGroups)) {
+    const R = 11, cx = 12, cy = 12;
+    const colors = group.trucks.map(t => t.color);
+    const n = colors.length;
+    const slices = n === 1
+      ? `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}"/>`
+      : colors.map((c,i) => {
+          const a1 = (i/n)*2*Math.PI - Math.PI/2, a2 = ((i+1)/n)*2*Math.PI - Math.PI/2;
+          const x1=cx+R*Math.cos(a1), y1=cy+R*Math.sin(a1);
+          const x2=cx+R*Math.cos(a2), y2=cy+R*Math.sin(a2);
+          return `<path d="M${cx},${cy} L${x1},${y1} A${R},${R} 0 0,1 ${x2},${y2} Z" fill="${c}"/>`;
+        }).join('');
+    const trucksHtml = group.trucks.map(t => {
+      const ts = t.tripInfo?.startTime ? t.tripInfo.startTime.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+      return `<div style="display:flex;align-items:center;gap:6px;margin:3px 0;"><span style="width:9px;height:9px;border-radius:50%;background:${t.color};display:inline-block;"></span><b>${t.truck.vehicle_no}</b><span style="color:#888;font-size:11px;"> · ${ts}</span></div>`;
+    }).join('');
+    L.marker(group.coords, {
+      icon: L.divIcon({
+        className: '',
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <clipPath id="oc${opin.replace(/\W/g,'_')}"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>
+          <circle cx="${cx}" cy="${cy}" r="${R}" fill="#fff"/>
+          <g clip-path="url(#oc${opin.replace(/\W/g,'_')})">${slices}</g>
+          <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#fff" stroke-width="2.5"/>
+        </svg>`,
+        iconAnchor: [12, 12], iconSize: [24, 24],
+      })
+    }).bindPopup(`<b>${group.city}</b><br><div style="margin-top:4px;">${trucksHtml}</div>`).addTo(liveRoutesMap);
+    allBounds.push(group.coords);
+  }
+
+  // draw current position diamonds — split-color if multiple trucks at same spot
+  for (const [key, group] of Object.entries(currentGroups)) {
+    const colors = group.trucks.map(t => t.color);
+    const n = colors.length;
+    const diamondSlices = n === 1
+      ? `<rect x="1" y="1" width="20" height="20" fill="${colors[0]}"/>`
+      : colors.map((c,i) => `<rect x="${i*(22/n)+1}" y="1" width="${22/n}" height="20" fill="${c}"/>`).join('');
+    const popupHtml = group.trucks.map(t => `
+      <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #eee;">
+        <b style="color:${t.color};font-size:13px;">${t.truck.vehicle_no}</b><br>
+        ${t.last.plaza}<br>
+        <small style="color:#888;">${t.last.crossed_at.substring(0,16)}</small>
+        ${t.dropCity ? `<br><span style="color:#1a9e6e;font-weight:700;">${t.dropCity}</span>` : ''}
+      </div>`).join('');
+    L.marker(group.coord, {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="width:22px;height:22px;animation:flashDiamond 1.4s ease-in-out infinite;transform:rotate(45deg);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" style="display:block;">
+            <clipPath id="dc${key.replace(/\W/g,'_')}"><rect x="1" y="1" width="20" height="20"/></clipPath>
+            <g clip-path="url(#dc${key.replace(/\W/g,'_')})">${diamondSlices}</g>
+            <rect x="1" y="1" width="20" height="20" fill="none" stroke="#fff" stroke-width="2"/>
+          </svg>
+        </div>`,
+        iconAnchor: [11, 11], iconSize: [22, 22],
+      })
+    }).bindPopup(`<div style="font-size:12px;line-height:1.8;min-width:170px;">${popupHtml}</div>`).addTo(liveRoutesMap);
+  }
+
+  if (allBounds.length > 0) liveRoutesMap.fitBounds(allBounds, { padding: [40, 40] });
+}
+
+// ── Credit Trips ──────────────────────────────────────────────────────────────
+let ctMap = null;
+let ctActiveTruck = null;
+let ctLastData = null;
+const ctGeocodeCache = {};
+const ctCityCache = {};
+
+async function initCreditTrips() {
+  if (ctMap) {
+    setTimeout(() => ctMap.invalidateSize(), 100);
+    loadCreditTrips().catch(console.error);
+    return;
+  }
+
+  await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+
+  ctMap = L.map('credit-trips-map').setView([18, 78], 5);
+  setTimeout(() => ctMap.invalidateSize(), 200);
+  L.tileLayer('https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png', {
+    attribution: '© Stadia Maps © OpenStreetMap contributors', maxZoom: 20
+  }).addTo(ctMap);
+
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = () => {
+    const d = L.DomUtil.create('div');
+    d.style.cssText = 'background:rgba(255,255,255,0.92);padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.9;box-shadow:0 2px 6px rgba(0,0,0,0.15);';
+    d.innerHTML = `
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#e05c2e" stroke="#fff" stroke-width="2"/></svg>
+        <span style="color:#444;">Starting point</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><rect x="1" y="1" width="16" height="16" fill="#2f6fd4" stroke="#fff" stroke-width="2" transform="rotate(45 9 9)"/></svg>
+        <span style="color:#444;">Current position</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="18" height="22" viewBox="0 0 18 22"><circle cx="9" cy="9" r="8" fill="#e05c2e" stroke="#fff" stroke-width="2"/><line x1="9" y1="17" x2="9" y2="22" stroke="#222" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <span style="color:#444;">Destination</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="30" height="12" viewBox="0 0 30 12"><line x1="0" y1="6" x2="30" y2="6" stroke="#888" stroke-width="2.5"/></svg>
+        <span style="color:#444;">Live route</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="30" height="12" viewBox="0 0 30 12"><line x1="0" y1="6" x2="30" y2="6" stroke="#888" stroke-width="2" stroke-dasharray="5 4"/></svg>
+        <span style="color:#444;">Planned route</span>
+      </div>
+`;
+    return d;
+  };
+  legend.addTo(ctMap);
+
+  loadCreditTrips().catch(e => console.error('loadCreditTrips error:', e));
+  // Office hours 9 AM–1 PM IST = 3:30–7:30 UTC → poll every 15 min
+  // Fixed refreshes: 12:00 AM IST (18:30 UTC), 12:30 PM IST (7:00 UTC), 5:30 PM IST (12:00 UTC), 11:30 PM IST (18:00 UTC)
+  function scheduleCTRefresh() {
+    const now = new Date();
+    const utcH = now.getUTCHours() + now.getUTCMinutes() / 60;
+    // office hours in UTC: 3.5 (9 AM IST) to 7.5 (1 PM IST)
+    const inOfficeHours = utcH >= 3.5 && utcH < 7.5;
+    if (inOfficeHours) {
+      // poll every 15 minutes
+      setTimeout(() => { loadCreditTrips().catch(console.error); scheduleCTRefresh(); }, 15 * 60 * 1000);
+    } else {
+      // fixed slots: midnight IST=18:30 UTC, 12:30PM IST=7:00 UTC, 5:30PM IST=12:00 UTC, 11:30PM IST=18:00 UTC
+      const slots = [{h:18,m:30},{h:7,m:0},{h:12,m:0},{h:18,m:0}];
+      let next = null;
+      for (const s of slots) {
+        const t = new Date(now);
+        t.setUTCHours(s.h, s.m, 0, 0);
+        if (t > now) { next = t; break; }
+      }
+      if (!next) {
+        next = new Date(now);
+        next.setUTCDate(next.getUTCDate() + 1);
+        next.setUTCHours(18, 30, 0, 0);
+      }
+      setTimeout(() => { loadCreditTrips().catch(console.error); scheduleCTRefresh(); }, next - now);
+    }
+  }
+  scheduleCTRefresh();
+}
+
+async function loadCreditTrips() {
+  const res  = await fetch(`${API}/api/credit-trips`);
+  const raw  = await res.json();
+  const trips = (raw.result?.data || raw || []);
+
+  ctActiveTruck = null;
+  const cards = document.getElementById('ct-truck-cards');
+  cards.innerHTML = '<div style="font-size:12px;color:#aaa;">Loading trips...</div>';
+  document.getElementById('ct-summary').textContent = `${trips.length} trips shown`;
+
+  async function geocodePin(pin) {
+    if (!pin || ctGeocodeCache[pin]) return;
+    try {
+      const g = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${pin}&countrycodes=in&format=json&limit=1`);
+      const j = await g.json();
+      if (j.length > 0) {
+        ctGeocodeCache[pin] = [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+        const parts = j[0].display_name.split(',');
+        ctCityCache[pin] = parts[1]?.trim() || parts[0]?.trim() || pin;
+      }
+    } catch(e) {}
+  }
+
+  const allPins = new Set();
+  trips.forEach(t => { if (t.pickup) allPins.add(t.pickup); if (t.drop) allPins.add(t.drop); });
+  await Promise.all([...allPins].map(geocodePin));
+
+  const truckData = trips.map((t, i) => ({
+    trip: t,
+    color: TRUCK_COLORS[i % TRUCK_COLORS.length],
+    pickupCoord: t.pickup ? ctGeocodeCache[t.pickup] : null,
+    dropCoord:   t.drop   ? ctGeocodeCache[t.drop]   : null,
+    pickupCity:  t.pickup ? (ctCityCache[t.pickup] || t.pickup) : '—',
+    dropCity:    t.drop   ? (ctCityCache[t.drop]   || t.drop)  : '—',
+    crossings:   [],
+  }));
+
+  // Fetch actual ULIP crossings for each truck in parallel
+  await Promise.all(truckData.map(async (td) => {
+    try {
+      const r = await fetch(`${API}/api/credit-truck-route?vehicle_no=${td.trip.truck_no}`);
+      const d = await r.json();
+      if (d.crossings && d.crossings.length > 0) td.crossings = d.crossings;
+    } catch(e) {}
+  }));
+
+  ctLastData = truckData;
+  ctDrawMarkers(truckData, null);
+
+  const liveData    = truckData.filter(td => td.crossings.length > 0);
+  const plannedData = truckData.filter(td => td.crossings.length === 0);
+
+  function cardHtml({ trip, color, pickupCity, dropCity, crossings, dropCoord }) {
+    const badge = crossings.length > 0
+      ? `<span style="font-size:10px;font-weight:700;color:#1a7a3a;background:#e6f7ec;padding:2px 7px;border-radius:20px;margin-left:6px;">Live</span>`
+      : `<span style="font-size:10px;font-weight:700;color:#7a5a1a;background:#fff8e6;padding:2px 7px;border-radius:20px;margin-left:6px;">Planned</span>`;
+    // Check if last crossing is near destination (within ~0.05 deg ≈ 5km)
+    let arrivedHtml = '';
+    if (crossings.length > 0 && dropCoord) {
+      const last = crossings[crossings.length - 1];
+      const dist = Math.abs(last.lat - dropCoord[0]) + Math.abs(last.lng - dropCoord[1]);
+      if (dist < 0.05) {
+        const dt = new Date(last.crossed_at.replace(' ','T') + '+05:30');
+        const formatted = dt.toLocaleString('en-IN', { timeZone:'Asia/Kolkata', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true });
+        arrivedHtml = `<div style="font-size:10px;color:#1a7a3a;font-weight:700;margin-top:4px;">Reached destination &nbsp;·&nbsp;${formatted}</div>`;
+      }
+    }
+    return `
+      <div class="ct-truck-card" data-vno="${trip.truck_no}"
+        onclick="ctFilterTruck('${trip.truck_no}')"
+        style="margin-bottom:10px;padding:10px;border-radius:10px;border-left:4px solid ${color};background:#f8faff;cursor:pointer;transition:opacity 0.2s,outline 0.2s;">
+        <div style="display:flex;align-items:center;">
+          <span style="font-size:12px;font-weight:800;color:#1a1a2e;">${trip.truck_no || '—'}</span>${badge}
+        </div>
+        <div style="font-size:11px;color:#888;margin-top:3px;">${trip.tranco || '—'}</div>
+        <div style="font-size:11px;color:#555;margin-top:3px;">${pickupCity} → ${dropCity}</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px;">LR #${trip.lr_number || '—'} &nbsp;·&nbsp; ${trip.lr_date || '—'}</div>
+        ${arrivedHtml}
+      </div>`;
+  }
+
+  cards.innerHTML = '';
+  if (liveData.length > 0) {
+    cards.innerHTML += `<div style="font-size:11px;font-weight:800;color:#1a9e6e;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding:4px 0;border-bottom:2px solid #1a9e6e;">FASTag Live (${liveData.length})</div>`;
+    liveData.forEach(td => { cards.innerHTML += cardHtml(td); });
+  }
+  if (plannedData.length > 0) {
+    cards.innerHTML += `<div style="font-size:11px;font-weight:800;color:#e67e22;text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 8px;padding:4px 0;border-bottom:2px solid #e67e22;">Planned Route (${plannedData.length})</div>`;
+    plannedData.forEach(td => { cards.innerHTML += cardHtml(td); });
+  }
+}
+
+function ctFilterTruck(vno) {
+  ctActiveTruck = (ctActiveTruck === vno) ? null : vno;
+  document.querySelectorAll('.ct-truck-card').forEach(el => {
+    const active = !ctActiveTruck || el.dataset.vno === ctActiveTruck;
+    el.style.opacity = active ? '1' : '0.35';
+    el.style.outline = (ctActiveTruck && el.dataset.vno === ctActiveTruck) ? '2px solid #2f6fd4' : 'none';
+  });
+  if (ctLastData) ctDrawMarkers(ctLastData, ctActiveTruck);
+}
+
+function ctPinSvg(color, clipId) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28" viewBox="0 0 24 28">
+    <circle cx="12" cy="10" r="9" fill="${color}" stroke="#fff" stroke-width="2.5"/>
+    <line x1="12" y1="19" x2="12" y2="27" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function ctCircleSvg(colors, clipId, R=11, sz=24) {
+  const cx = sz/2, cy = sz/2, n = colors.length;
+  const slices = n === 1
+    ? `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}"/>`
+    : colors.map((c,i) => {
+        const a1=(i/n)*2*Math.PI-Math.PI/2, a2=((i+1)/n)*2*Math.PI-Math.PI/2;
+        const x1=cx+R*Math.cos(a1), y1=cy+R*Math.sin(a1);
+        const x2=cx+R*Math.cos(a2), y2=cy+R*Math.sin(a2);
+        return `<path d="M${cx},${cy} L${x1},${y1} A${R},${R} 0 0,1 ${x2},${y2} Z" fill="${c}"/>`;
+      }).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}">
+    <clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="#fff"/>
+    <g clip-path="url(#${clipId})">${slices}</g>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#fff" stroke-width="2.5"/>
+  </svg>`;
+}
+
+function ctDiamondSvg(colors, clipId) {
+  const n = colors.length;
+  const slices = n === 1
+    ? `<rect x="1" y="1" width="20" height="20" fill="${colors[0]}"/>`
+    : colors.map((c,i) => `<rect x="${i*(22/n)+1}" y="1" width="${22/n}" height="20" fill="${c}"/>`).join('');
+  return `<div style="width:22px;height:22px;animation:flashDiamond 1.4s ease-in-out infinite;transform:rotate(45deg);">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" style="display:block;">
+      <clipPath id="${clipId}"><rect x="1" y="1" width="20" height="20"/></clipPath>
+      <g clip-path="url(#${clipId})">${slices}</g>
+      <rect x="1" y="1" width="20" height="20" fill="none" stroke="#fff" stroke-width="2"/>
+    </svg>
+  </div>`;
+}
+
+function ctDrawMarkers(truckData, filterVno) {
+  ctMap.eachLayer(l => { if (l instanceof L.Polyline || l instanceof L.Marker || l instanceof L.CircleMarker) ctMap.removeLayer(l); });
+
+  const visible = filterVno ? truckData.filter(td => td.trip.truck_no === filterVno) : truckData;
+  const allBounds = [];
+  const originGroups  = {};
+  const currentGroups = {};
+  const dropGroups    = {};
+
+  for (const td of visible) {
+    const { trip, color, pickupCoord, dropCoord, dropCity } = td;
+    const hasLive = td.crossings && td.crossings.length > 0;
+    const dkey = trip.drop || ('_d_' + trip.truck_no);
+
+    if (hasLive) {
+      const crossCoords = td.crossings.map(c => [c.lat, c.lng]);
+      const first = td.crossings[0];
+      const last  = td.crossings[td.crossings.length - 1];
+
+      // Origin: pickupCoord if geocoded, else first crossing
+      const originCoord = pickupCoord || [first.lat, first.lng];
+      const originCity  = pickupCoord ? (td.pickupCity || trip.pickup) : first.plaza;
+      const okey = `${originCoord[0].toFixed(3)},${originCoord[1].toFixed(3)}`;
+      if (!originGroups[okey]) originGroups[okey] = { coord: originCoord, city: originCity, trucks: [] };
+      originGroups[okey].trucks.push({ trip, color });
+      allBounds.push(originCoord);
+
+      // Segment: solid line from origin → all crossings (confirmed route)
+      const solidCoords = [originCoord, ...crossCoords];
+      // deduplicate consecutive identical points
+      const dedupedSolid = solidCoords.filter((c,i) => i===0 || c[0]!==solidCoords[i-1][0] || c[1]!==solidCoords[i-1][1]);
+      if (dedupedSolid.length >= 2) {
+        L.polyline(dedupedSolid, { color, weight: 3, opacity: 0.9 }).addTo(ctMap);
+      }
+      crossCoords.forEach(c => allBounds.push(c));
+
+      // Segment: last crossing → dropCoord (dashed — estimated remaining)
+      if (dropCoord) {
+        const dist = Math.abs(dropCoord[0]-last.lat) + Math.abs(dropCoord[1]-last.lng);
+        if (dist > 0.005) {
+          L.polyline([[last.lat, last.lng], dropCoord], { color, weight:2, opacity:0.55, dashArray:'5 7' }).addTo(ctMap);
+        }
+      }
+
+      // Current position diamond
+      const ckey = `${last.lat.toFixed(3)},${last.lng.toFixed(3)}`;
+      if (!currentGroups[ckey]) currentGroups[ckey] = { coord: [last.lat, last.lng], trucks: [] };
+      currentGroups[ckey].trucks.push({ trip, color, last });
+      allBounds.push([last.lat, last.lng]);
+
+    } else {
+      // Planned: dashed straight line pickup → drop
+      const okey = trip.pickup || ('_o_' + trip.truck_no);
+      if (pickupCoord && dropCoord) {
+        L.polyline([pickupCoord, dropCoord], { color, weight: 2.5, opacity: 0.75, dashArray: '7 9' }).addTo(ctMap);
+        allBounds.push(pickupCoord, dropCoord);
+      }
+      if (pickupCoord) {
+        if (!originGroups[okey]) originGroups[okey] = { coord: pickupCoord, city: td.pickupCity, trucks: [] };
+        originGroups[okey].trucks.push({ trip, color });
+        allBounds.push(pickupCoord);
+      }
+    }
+
+    // Destination pin for all trucks with a drop coord
+    if (dropCoord) {
+      if (!dropGroups[dkey]) dropGroups[dkey] = { coord: dropCoord, city: dropCity, trucks: [] };
+      dropGroups[dkey].trucks.push({ trip, color });
+      allBounds.push(dropCoord);
+    }
+  }
+
+  // Origin circles
+  for (const [key, group] of Object.entries(originGroups)) {
+    const colors = group.trucks.map(t => t.color);
+    const clipId = `cto_${key.replace(/\W/g,'_')}`;
+    const popupHtml = group.trucks.map(t =>
+      `<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;"></span>
+        <b>${t.trip.truck_no}</b><span style="color:#888;font-size:11px;"> · ${t.trip.tranco || ''}</span>
+      </div>`).join('');
+    L.marker(group.coord, {
+      icon: L.divIcon({ className:'', html: ctCircleSvg(colors, clipId), iconAnchor:[12,12], iconSize:[24,24] })
+    }).bindPopup(`<b>Origin: ${group.city}</b><br><div style="margin-top:4px;">${popupHtml}</div>`)
+      .addTo(ctMap);
+    allBounds.push(group.coord);
+  }
+
+  // Current position diamonds
+  for (const [key, group] of Object.entries(currentGroups)) {
+    const colors = group.trucks.map(t => t.color);
+    const clipId = `ctd_${key.replace(/\W/g,'_')}`;
+    const popupHtml = group.trucks.map(t =>
+      `<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #eee;">
+        <b style="color:${t.color}">${t.trip.truck_no}</b><br>
+        ${t.last.plaza}<br>
+        <small style="color:#888;">${t.last.crossed_at.slice(0,16)}</small>
+      </div>`).join('');
+    L.marker(group.coord, {
+      icon: L.divIcon({ className:'', html: ctDiamondSvg(colors, clipId), iconAnchor:[11,11], iconSize:[22,22] })
+    }).bindPopup(`<div style="font-size:12px;line-height:1.8;min-width:160px;">${popupHtml}</div>`)
+      .addTo(ctMap);
+    allBounds.push(group.coord);
+  }
+
+  // Destination pins
+  for (const [dkey, group] of Object.entries(dropGroups)) {
+    const colors = group.trucks.map(t => t.color);
+    const n = colors.length;
+    const R = 9, cx = 12, cy = 10;
+    const slices = n === 1
+      ? `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${colors[0]}"/>`
+      : colors.map((c,i) => {
+          const a1=(i/n)*2*Math.PI-Math.PI/2, a2=((i+1)/n)*2*Math.PI-Math.PI/2;
+          const x1=cx+R*Math.cos(a1), y1=cy+R*Math.sin(a1);
+          const x2=cx+R*Math.cos(a2), y2=cy+R*Math.sin(a2);
+          return `<path d="M${cx},${cy} L${x1},${y1} A${R},${R} 0 0,1 ${x2},${y2} Z" fill="${c}"/>`;
+        }).join('');
+    const clipId = `ctdp_${dkey.replace(/\W/g,'_')}`;
+    const popupHtml = group.trucks.map(t =>
+      `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;"></span>
+        <b>${t.trip.truck_no}</b>
+      </div>`).join('');
+    L.marker(group.coord, {
+      icon: L.divIcon({
+        className: '',
+        html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="28" viewBox="0 0 24 28">
+          <clipPath id="${clipId}"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>
+          <circle cx="${cx}" cy="${cy}" r="${R}" fill="#fff"/>
+          <g clip-path="url(#${clipId})">${slices}</g>
+          <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#fff" stroke-width="2.5"/>
+          <line x1="${cx}" y1="${cy+R}" x2="${cx}" y2="27" stroke="#222" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>`,
+        iconAnchor: [12, 27], iconSize: [24, 28],
+      })
+    }).bindPopup(`<b>Destination: ${group.city}</b><br><div style="margin-top:4px;">${popupHtml}</div>`)
+      .addTo(ctMap);
+  }
+
+  if (allBounds.length > 0) {
+    const validBounds = L.latLngBounds();
+    allBounds.forEach(pt => {
+      const lat = Array.isArray(pt) ? pt[0] : pt.lat;
+      const lng = Array.isArray(pt) ? pt[1] : pt.lng;
+      if (lat > 5 && lat < 38 && lng > 65 && lng < 98) validBounds.extend([lat, lng]);
+    });
+    if (validBounds.isValid()) ctMap.fitBounds(validBounds, { padding: [40, 40], maxZoom: 12 });
+  }
+}
+</script>
+</body>
+</html>
