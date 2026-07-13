@@ -265,8 +265,12 @@ def track_by_token():
 
 @application.route('/api/send-report')
 def send_report_now():
-    send_morning_report()
-    return jsonify({'status': 'sent'})
+    try:
+        send_morning_report()
+        return jsonify({'status': 'sent'})
+    except Exception as e:
+        print(f'send_report_now ERROR: {e}', flush=True)
+        return jsonify({'status': 'error', 'error': str(e)})
 
 @application.route('/api/ping-truck')
 def ping_truck():
