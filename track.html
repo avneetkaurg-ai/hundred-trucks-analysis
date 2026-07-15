@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIRCHILIME Connect — Live Tracking</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #F2E9DC;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    a { color: #B8860B; text-decoration: none; }
+    a:hover { color: #8A6100; }
+    .leaflet-container { font-family: 'Plus Jakarta Sans', sans-serif; background: #DCEBF0; }
+    .leaflet-control-zoom a { color: #3A2C24 !important; border-color: #EADDCB !important; }
+
+    @keyframes mlpulse {
+      0%   { box-shadow: 0 0 0 0 rgba(234,179,8,0.6); }
+      70%  { box-shadow: 0 0 0 16px rgba(234,179,8,0); }
+      100% { box-shadow: 0 0 0 0 rgba(234,179,8,0); }
+    }
+    .mldot    { width: 20px; height: 20px; border-radius: 50%; background: #EAB308; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.3); animation: mlpulse 2s infinite; }
+    .mlorigin { width: 16px; height: 16px; border-radius: 50%; background: #6C9A3E; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.25); }
+    .mldest   { width: 28px; height: 36px; position: relative; }
+    .mldest::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 28px; height: 28px; border-radius: 50% 50% 50% 0; background: #3A2C24; transform: translateX(-50%) rotate(-45deg); box-shadow: 0 3px 8px rgba(0,0,0,0.35); }
+    .mldest::after  { content: ''; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 10px; height: 10px; border-radius: 50%; background: #fff; z-index: 1; }
+
+    .card {
+      width: 100%;
+      max-width: 940px;
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 30px 60px -24px rgba(58,44,36,0.45);
+      border: 1px solid #EADDCB;
+      background: #FFFCF8;
+      display: flex;
+      flex-direction: column;
+    }
+    #map { width: 100%; height: 480px; z-index: 0; flex-shrink: 0; }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; padding: 16px 20px;
+      background: #FFFCF8; border-bottom: 1px solid #EFE3D3;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .brand-mark { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg,#F2C230,#F6D96B); display: flex; align-items: center; justify-content: center; }
+    .brand-mark span { width: 11px; height: 11px; border-radius: 3px; background: #8A6100; }
+    .brand-name { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 15px; color: #2A211C; }
+    .brand-name b { color: #6C9A3E; font-weight: 800; }
+
+    .valid {
+      padding: 6px 14px; border-radius: 12px; text-align: right;
+      background: #F7EFE4; border: 1px solid #EFE3D3;
+    }
+    .label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A8937F; font-weight: 700; }
+    .valid-date { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 14px; color: #2A211C; }
+
+    .panel {
+      background: #FFFCF8;
+      border-top: 1px solid #EFE3D3;
+      padding: 22px 24px;
+    }
+    .panel-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .label-sm { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #A8937F; font-weight: 700; }
+    .truckno { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 30px; color: #2A211C; letter-spacing: 0.01em; }
+    .sub { font-size: 14px; color: #6F5F52; font-weight: 500; margin-top: 2px; }
+
+    .freshness { display: flex; align-items: center; gap: 8px; background: #FCEEDE; border: 1px solid #F5D9BE; padding: 8px 14px; border-radius: 999px; }
+    .freshness.fresh { background: #EEF6E5; border-color: #C8E6A0; }
+    .freshness.fresh .fresh-dot { background: #6C9A3E !important; box-shadow: 0 0 0 3px rgba(108,154,62,0.2) !important; }
+    .freshness.fresh .fresh-text { color: #4F7A28 !important; }
+    .fresh-dot { width: 9px; height: 9px; border-radius: 50%; background: #E09A3C; box-shadow: 0 0 0 3px rgba(224,154,60,0.2); }
+    .fresh-text { font-weight: 700; font-size: 13px; color: #B37217; }
+
+    .divider { height: 1px; background: #EFE3D3; margin: 20px 0; }
+
+    .route { display: flex; align-items: center; gap: 14px; }
+    .route-end { flex: 0 0 auto; }
+    .route-end .label-sm { font-size: 11px; letter-spacing: 0.08em; }
+    .route-place { font-weight: 700; font-size: 15px; color: #2A211C; }
+    .route-line { flex: 1; position: relative; height: 22px; }
+    .route-line .track { position: absolute; top: 50%; left: 0; right: 0; height: 4px; transform: translateY(-50%); border-radius: 3px; background: repeating-linear-gradient(90deg,#DDCBB4 0 6px, transparent 6px 12px); }
+    .route-line .fill  { position: absolute; top: 50%; left: 0; width: 0%; height: 4px; transform: translateY(-50%); border-radius: 3px; background: linear-gradient(90deg,#6C9A3E,#EAB308); transition: width 1s ease; }
+    .route-line .knob  { position: absolute; top: 50%; left: 0%; transform: translate(-50%,-50%); width: 16px; height: 16px; border-radius: 50%; background: #EAB308; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.25); transition: left 1s ease; }
+
+    .footrow { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 20px; align-items: center; }
+    .loc { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 12px; background: #F7EFE4; border-radius: 16px; padding: 12px 16px; }
+    .loc-pin { width: 38px; height: 38px; border-radius: 11px; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(58,44,36,0.12); flex-shrink: 0; }
+    .loc-pin span { width: 12px; height: 12px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #EAB308; }
+    .loc-name { font-weight: 700; font-size: 16px; color: #2A211C; }
+    .loc-time { font-size: 12px; color: #8A7B70; }
+
+    .actions { display: flex; gap: 10px; }
+    .btn-call { display: flex; align-items: center; gap: 8px; background: #EEF4E4; color: #4F7A28; font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 14px; cursor: pointer; }
+    .btn-call span { width: 8px; height: 8px; border-radius: 50%; background: #6C9A3E; }
+    .btn-wa { display: flex; align-items: center; gap: 8px; background: #F2C230; color: #2A211C; font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 14px; cursor: pointer; box-shadow: 0 8px 18px -8px rgba(242,194,48,0.75); }
+
+    /* Loading state */
+    .skeleton { background: linear-gradient(90deg, #EFE3D3 25%, #F7EFE4 50%, #EFE3D3 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 6px; display: inline-block; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* Error / not found */
+    .error-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; text-align: center; padding: 40px;
+    }
+    .error-screen .err-code { font-family: 'Bricolage Grotesque', sans-serif; font-size: 80px; font-weight: 800; color: #DDCBB4; }
+    .error-screen .err-title { font-size: 20px; font-weight: 700; color: #2A211C; margin-top: 8px; }
+    .error-screen .err-sub { font-size: 14px; color: #8A7B70; margin-top: 8px; max-width: 280px; }
+
+    @media (max-width: 640px) {
+      body { padding: 0; background: #FFFCF8; }
+      .card { max-width: none; border-radius: 0; border: none; box-shadow: none; min-height: 100vh; }
+      #map { height: 52vh; }
+      .topbar { padding: 12px 16px; }
+      .brand-name { font-size: 13px; }
+      .valid { padding: 5px 10px; }
+      .valid-date { font-size: 12px; }
+      .panel { padding: 16px; }
+      .truckno { font-size: 22px; }
+      .sub { font-size: 13px; }
+      .divider { margin: 14px 0; }
+      .route-place { font-size: 13px; }
+      .footrow { flex-direction: column; gap: 10px; }
+      .loc { width: 100%; }
+      .actions { width: 100%; gap: 8px; }
+      .btn-call, .btn-wa { flex: 1; justify-content: center; font-size: 13px; padding: 12px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="map"></div>
+
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><span></span></div>
+        <div class="brand-name">MIRCHILIME <b>Connect</b></div>
+      </div>
+      <div class="valid">
+        <div class="label">Link valid till</div>
+        <div class="valid-date" id="validDate">—</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="label-sm">Truck number</div>
+          <div class="truckno" id="truckNo">—</div>
+          <div class="sub" id="subInfo">Loading...</div>
+        </div>
+        <div class="freshness" id="freshness">
+          <span class="fresh-dot"></span>
+          <span class="fresh-text">Loading...</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="route">
+        <div class="route-end">
+          <div class="label-sm">Origin</div>
+          <div class="route-place" id="originCity">—</div>
+        </div>
+        <div class="route-line">
+          <div class="track"></div>
+          <div class="fill" id="routeFill"></div>
+          <div class="knob" id="routeKnob"></div>
+        </div>
+        <div class="route-end" style="text-align:right;">
+          <div class="label-sm">Destination</div>
+          <div class="route-place" id="destCity">—</div>
+        </div>
+      </div>
+
+      <div class="footrow">
+        <div class="loc">
+          <div class="loc-pin"><span></span></div>
+          <div>
+            <div class="label-sm">Current location</div>
+            <div class="loc-name" id="locName">—</div>
+            <div class="loc-time" id="locTime">—</div>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn-call" id="callBtn" href="tel:+910000000000"><span></span> Call driver</a>
+          <a class="btn-wa" id="waBtn" href="https://wa.me/910000000000" target="_blank" rel="noopener">WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'http://localhost:8081'
+      : 'https://hundred-trucks-analysis.onrender.com';
+
+    const EXPIRY   = new Date('2026-07-20');
+    const TOKEN    = new URLSearchParams(location.search).get('token') || '';
+    const TRUCK_NO = new URLSearchParams(location.search).get('truck') || '';
+
+    // No token — show error inline
+    if (!TOKEN && !TRUCK_NO) {
+      document.querySelector('.panel').style.display = 'none';
+      document.querySelector('.topbar').style.display = 'none';
+      document.getElementById('map').innerHTML = `
+        <div class="error-screen">
+          <div class="err-code">404</div>
+          <div class="err-title">Link not found</div>
+          <div class="err-sub">This tracking link is invalid or has expired. Contact your logistics provider for a valid link.</div>
+        </div>`;
+      return;
+    }
+
+    // Leaflet map
+    const map = L.map('map', { zoomControl: true, scrollWheelZoom: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap · © CARTO', maxZoom: 19
+    }).addTo(map);
+
+    function icon(cls, size) {
+      return L.divIcon({ className: '', html: '<div class="' + cls + '"></div>', iconSize: [size, size], iconAnchor: [size/2, size/2] });
+    }
+
+    function istDate(dt) {
+      return new Date(dt.replace(' ', 'T') + '+05:30');
+    }
+
+    function fmtTime(dt) {
+      const d = istDate(dt);
+      return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', timeZone:'Asia/Kolkata' }) + ', ' +
+             d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', timeZone:'Asia/Kolkata', hour12:true });
+    }
+
+    function timeAgo(dt) {
+      const diff = Math.round((Date.now() - istDate(dt)) / 60000);
+      if (diff < 60) return diff + 'm ago';
+      if (diff < 1440) return Math.round(diff/60) + 'h ago';
+      return Math.round(diff/1440) + 'd ago';
+    }
+
+    function haversine(lat1, lng1, lat2, lng2) {
+      const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    async function geocodePin(pincode) {
+      try {
+        const res  = await fetch('https://api.postalpincode.in/pincode/' + pincode);
+        const data = await res.json();
+        if (data[0].Status === 'Success') {
+          const p = data[0].PostOffice[0];
+          return { city: p.District || p.Name, state: p.State || '' };
+        }
+      } catch(e) {}
+      return { city: pincode, state: '' };
+    }
+
+    async function geocodeLatLng(q) {
+      try {
+        const res  = await fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q + ', India') + '&format=json&limit=1');
+        const data = await res.json();
+        if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      } catch(e) {}
+      return null;
+    }
+
+    async function load() {
+      // Expired check
+      if (new Date() > EXPIRY) {
+        document.querySelector('.panel').style.display = 'none';
+        document.querySelector('.topbar').style.display = 'none';
+        document.getElementById('map').innerHTML = `
+          <div class="error-screen">
+            <div class="err-code" style="font-size:56px">Link Expired</div>
+            <div class="err-sub" style="margin-top:12px">This delivery has been completed. The tracking link is no longer active.</div>
+          </div>`;
+        return;
+      }
+
+      // Set valid till
+      document.getElementById('validDate').textContent = EXPIRY.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+
+      // Fetch crossing data
+      let resolvedTruck = TRUCK_NO;
+      let crossings = [];
+      let ownerName = '';
+      try {
+        const url  = TOKEN ? `${API}/api/track?token=${TOKEN}` : `${API}/api/hundred-truck-detail?vehicle_no=${TRUCK_NO}`;
+        const res  = await fetch(url);
+        const data = await res.json();
+        if (data.error) {
+          document.querySelector('.panel').style.display = 'none';
+          document.getElementById('map').innerHTML = `<div class="error-screen"><div class="err-code">404</div><div class="err-title">Invalid link</div><div class="err-sub">This tracking link is invalid or has expired.</div></div>`;
+          return;
+        }
+        resolvedTruck = data.vehicle_no || TRUCK_NO;
+        crossings     = (data.crossings || []).filter(c => c.lat && c.lat !== 0);
+        ownerName     = data.truck?.owner || data.truck?.owner_name || '';
+      } catch(e) {}
+
+      document.getElementById('truckNo').textContent = resolvedTruck;
+
+      // Fetch trip info
+      let pickupCity = '—', dropCity = '—', pickupPin = '', dropPin = '';
+      let shipper = '', tranco = '';
+      let pickupGeo = null, dropGeo = null;
+      try {
+        const res  = await fetch(API + '/api/enroute-trips');
+        const data = await res.json();
+        const trips = data.result?.data || [];
+        const trip  = trips.find(t => t.truck_number.trim() === resolvedTruck.trim());
+        if (trip) {
+          shipper  = trip.shipper || '';
+          tranco   = trip.tranco  || '';
+          pickupPin = trip.pickup_pincode || '';
+          dropPin   = trip.drop_pincode   || '';
+          const [pu, dr] = await Promise.all([geocodePin(pickupPin), geocodePin(dropPin)]);
+          pickupCity = pu.city;
+          dropCity   = dr.city;
+          [pickupGeo, dropGeo] = await Promise.all([
+            geocodeLatLng(pu.city + (pu.state ? ', ' + pu.state : '')),
+            geocodeLatLng(dr.city + (dr.state ? ', ' + dr.state : ''))
+          ]);
+        }
+      } catch(e) {}
+
+      // Sub line
+      const subParts = [];
+      if (tranco) subParts.push(tranco);
+      if (shipper) subParts.push(shipper + ' Shipment');
+      document.getElementById('subInfo').textContent = subParts.join(' · ') || ownerName || resolvedTruck;
+
+      // Origin / destination city labels
+      if (crossings.length > 0) {
+        document.getElementById('originCity').textContent = crossings[0].plaza;
+      } else if (pickupCity !== '—') {
+        document.getElementById('originCity').textContent = pickupCity;
+      }
+      document.getElementById('destCity').textContent = dropCity !== '—' ? dropCity : '—';
+
+      // Progress bar
+      let progress = 0;
+      if (crossings.length > 0 && pickupGeo && dropGeo) {
+        const first = crossings[0], last = crossings[crossings.length - 1];
+        const totalDist   = haversine(pickupGeo.lat, pickupGeo.lng, dropGeo.lat, dropGeo.lng);
+        const traveledDist = haversine(first.lat, first.lng, last.lat, last.lng);
+        const distToFirst  = haversine(pickupGeo.lat, pickupGeo.lng, first.lat, first.lng);
+        progress = Math.min(97, Math.round(((distToFirst + traveledDist) / totalDist) * 100));
+      } else if (crossings.length > 0) {
+        progress = 50;
+      }
+      document.getElementById('routeFill').style.width = progress + '%';
+      document.getElementById('routeKnob').style.left  = progress + '%';
+
+      // Current location & freshness
+      if (crossings.length > 0) {
+        const last = crossings[crossings.length - 1];
+        document.getElementById('locName').textContent = last.plaza;
+        const diffMin = Math.round((Date.now() - istDate(last.crossed_at)) / 60000);
+        const countText = crossings.length + ' toll' + (crossings.length !== 1 ? 's' : '') + ' crossed';
+        document.getElementById('locTime').textContent = fmtTime(last.crossed_at) + ' · ' + countText;
+
+        const ageText = timeAgo(last.crossed_at);
+        document.querySelector('.fresh-text').textContent = 'Updated ' + ageText;
+        if (diffMin < 360) {
+          document.getElementById('freshness').classList.add('fresh');
+        }
+      } else {
+        document.getElementById('locName').textContent = 'No crossing data yet';
+        document.getElementById('locTime').textContent = '—';
+        document.querySelector('.fresh-text').textContent = 'No data';
+      }
+
+      // Map: draw route
+      const coords = crossings.map(c => [c.lat, c.lng]);
+      if (coords.length > 1) {
+        var routeLine = L.polyline(coords, { color: '#E0A800', weight: 5, opacity: 0.98, lineJoin: 'round' }).addTo(map);
+        L.polylineDecorator(routeLine, {
+          patterns: [{
+            offset: '10%', repeat: '15%',
+            symbol: L.Symbol.arrowHead({
+              pixelSize: 10,
+              headAngle: 45,
+              pathOptions: { color: '#fff', fillOpacity: 1, weight: 0, fillColor: '#fff' }
+            })
+          }]
+        }).addTo(map);
+      }
+
+      // Remaining dashed line to drop geo
+      if (coords.length > 0 && dropGeo) {
+        const lastCoord = coords[coords.length - 1];
+        L.polyline([lastCoord, [dropGeo.lat, dropGeo.lng]], {
+          color: '#B79A7C', weight: 4, opacity: 0.8, dashArray: '2, 10', lineCap: 'round'
+        }).addTo(map);
+      }
+
+      // Markers
+      if (coords.length > 0) {
+        L.marker(coords[0], { icon: icon('mlorigin', 16) }).addTo(map)
+          .bindPopup('<b>Origin</b><br>' + crossings[0].plaza);
+      }
+      if (dropGeo) {
+        L.marker([dropGeo.lat, dropGeo.lng], { icon: L.divIcon({ className: '', html: '<div class="mldest"></div>', iconSize: [28, 36], iconAnchor: [14, 36] }) }).addTo(map)
+          .bindTooltip(dropCity, { direction: 'top' })
+          .bindPopup('<b>Destination</b><br>' + dropCity + (dropPin ? '<br>Pincode: ' + dropPin : ''), { offset: [0, -30] });
+      }
+      if (coords.length > 0) {
+        const last = crossings[crossings.length - 1];
+        L.marker(coords[coords.length - 1], { icon: icon('mldot', 20) }).addTo(map)
+          .bindPopup('<b>Current Location</b><br>' + last.plaza);
+      }
+
+      // Fit bounds
+      const allPoints = [...coords];
+      if (dropGeo) allPoints.push([dropGeo.lat, dropGeo.lng]);
+      if (allPoints.length > 0) {
+        map.fitBounds(L.latLngBounds(allPoints), { padding: [60, 60] });
+      } else {
+        map.setView([17, 79], 6);
+      }
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    load();
+    setInterval(load, 2 * 60 * 60 * 1000);
+  })();
+  </script>
+</body>
+</html>
