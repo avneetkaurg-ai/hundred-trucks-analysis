@@ -111,6 +111,8 @@
     .btn-call { display: flex; align-items: center; gap: 8px; background: #EEF4E4; color: #4F7A28; font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 14px; cursor: pointer; }
     .btn-call span { width: 8px; height: 8px; border-radius: 50%; background: #6C9A3E; }
     .btn-wa { display: flex; align-items: center; gap: 8px; background: #F2C230; color: #2A211C; font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 14px; cursor: pointer; box-shadow: 0 8px 18px -8px rgba(242,194,48,0.75); }
+    .btn-tolls { display: flex; align-items: center; gap: 8px; background: #F7EFE4; color: #6F5F52; font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 14px; cursor: pointer; border: 1.5px solid #EFE3D3; transition: background 0.2s, color 0.2s; }
+    .btn-tolls.active { background: #3A2C24; color: #fff; border-color: #3A2C24; }
 
     /* Loading state */
     .skeleton { background: linear-gradient(90deg, #EFE3D3 25%, #F7EFE4 50%, #EFE3D3 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 6px; display: inline-block; }
@@ -203,6 +205,7 @@
         <div class="actions">
           <a class="btn-call" id="callBtn" href="tel:+910000000000"><span></span> Call driver</a>
           <a class="btn-wa" id="waBtn" href="https://wa.me/910000000000" target="_blank" rel="noopener">WhatsApp</a>
+          <button class="btn-tolls" id="tollsBtn" onclick="toggleTolls()">🛣 Toll Plazas</button>
         </div>
       </div>
     </div>
@@ -232,7 +235,7 @@
     }
 
     // Leaflet map
-    const map = L.map('map', { zoomControl: true, scrollWheelZoom: false });
+    const map = window._map = L.map('map', { zoomControl: true, scrollWheelZoom: false });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap · © CARTO', maxZoom: 19
     }).addTo(map);
@@ -392,7 +395,18 @@
         document.querySelector('.fresh-text').textContent = 'No data';
       }
 
-      // Map: draw route
+      // Store plaza markers for toggle
+    window._plazaMarkers = [];
+    window._plazasVisible = false;
+    crossings.forEach((c, i) => {
+      const m = L.circleMarker([c.lat, c.lng], {
+        radius: 5, color: '#3A2C24', fillColor: '#fff',
+        fillOpacity: 1, weight: 2, opacity: 0.9
+      }).bindPopup(`<b>${c.plaza}</b><br><span style="font-size:11px;color:#888;">${fmtTime(c.crossed_at)}</span>`);
+      window._plazaMarkers.push(m);
+    });
+
+    // Map: draw route
       const coords = crossings.map(c => [c.lat, c.lng]);
       if (coords.length > 1) {
         var routeLine = L.polyline(coords, { color: '#E0A800', weight: 5, opacity: 0.98, lineJoin: 'round' }).addTo(map);
@@ -446,6 +460,20 @@
     load();
     setInterval(load, 2 * 60 * 60 * 1000);
   })();
+
+  function toggleTolls() {
+    const btn = document.getElementById('tollsBtn');
+    window._plazasVisible = !window._plazasVisible;
+    if (window._plazasVisible) {
+      window._plazaMarkers.forEach(m => m.addTo(window._map));
+      btn.classList.add('active');
+      btn.textContent = '🛣 Hide Plazas';
+    } else {
+      window._plazaMarkers.forEach(m => m.remove());
+      btn.classList.remove('active');
+      btn.textContent = '🛣 Toll Plazas';
+    }
+  }
   </script>
 </body>
 </html>
