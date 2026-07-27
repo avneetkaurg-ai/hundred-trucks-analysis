@@ -61,7 +61,7 @@ Set these on Render (or in a `.env` file for local dev):
 
 | Time | Job | Description |
 |---|---|---|
-| 6 AM – 11 PM, :00 | `ping_enroute` | Fetch FASTag crossings for all live trucks (18×/day) |
+| 6 AM – 11 PM| `ping_enroute` | Fetch FASTag crossings for all live trucks (18×/day) |
 | 9 AM, 1 PM, 6 PM | `ping_credit` | Sync credit/balance data |
 | 11:05 AM & 7:05 PM | `auto_send_report` | WhatsApp summary + per-truck tracking links |
 
