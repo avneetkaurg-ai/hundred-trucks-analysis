@@ -50,9 +50,7 @@ Set these on Render (or in a `.env` file for local dev):
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | Neon PostgreSQL connection string |
-| `TOKEN_SECRET` | Secret key for HMAC tracking tokens |
-| `WA_TOKEN` | Meta WhatsApp API bearer token |
-| `WA_PHONE_ID` | Meta WhatsApp phone number ID |
+| `TOKEN_SECRET` | Secret key for HMAC tracking tokens (any random string) |
 | `WA_TO` | Default WhatsApp recipient number (e.g. `+919518146736`) |
 
 ---
@@ -61,7 +59,7 @@ Set these on Render (or in a `.env` file for local dev):
 
 | Time | Job | Description |
 |---|---|---|
-| 6 AM – 11 PM| `ping_enroute` | Fetch FASTag crossings for all live trucks (18×/day) |
+| 6 AM – 11 PM, :00 | `ping_enroute` | Fetch FASTag crossings for all live trucks (18×/day) |
 | 9 AM, 1 PM, 6 PM | `ping_credit` | Sync credit/balance data |
 | 11:05 AM & 7:05 PM | `auto_send_report` | WhatsApp summary + per-truck tracking links |
 
@@ -112,6 +110,53 @@ gunicorn wsgi:application --workers 1
 ```
 
 The single worker is intentional — APScheduler uses a file lock (`/tmp/hundred_scheduler.lock`) to ensure only one process runs scheduled jobs.
+
+---
+
+## Developer Setup
+
+For someone picking up this project for the first time.
+
+### 1. Database
+
+Create a free Neon PostgreSQL database at [neon.tech](https://neon.tech). The connection string goes in `DATABASE_URL`. The app expects these tables to already exist:
+
+- `trucks` — vehicle number, route, connected status
+- `toll_crossings` — every FASTag crossing per truck
+- `enroute_trips` — active long-distance trips with origin/destination
+- `credit_trips` — short-distance trips within Tamil Nadu
+
+The schema for each table is defined in the technical documentation PDF.
+
+### 2. Zoho API
+
+The app pulls FASTag data from a **Zoho Creator** application owned by Mirchi-Lime. You need:
+
+- The Zoho report URL for FASTag crossings (`ZOHO_FASTAG_URL` used in `ping_enroute`)
+- The Zoho WA API URL for sending WhatsApp messages (`ZOHO_WA_URL` used in `auto_send_report`)
+
+Both URLs are already hardcoded in `wsgi.py` — no credentials needed as they use a public key in the URL. Ask the project owner if these URLs need to be updated.
+
+### 3. How the code is organised
+
+Everything lives in `wsgi.py`. The main flows are:
+
+| Flow | Functions involved |
+|---|---|
+| FASTag sync | `ping_enroute()` → Zoho API → inserts into `toll_crossings` |
+| Dashboard load | `/api/hundred-trucks` → reads `trucks` + `toll_crossings` |
+| Tracking link | `/api/make-token` → HMAC token → `/api/track?token=` → `track.html` |
+| WhatsApp report | `auto_send_report()` → `make_token()` per truck → Zoho WA API |
+| Scheduler | `BackgroundScheduler` starts on app launch, guarded by fcntl file lock |
+
+### 4. Common issues
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Scheduler not firing | Multiple workers running | Always use `--workers 1` with Gunicorn |
+| `/api/send-report` crashes | `TOKEN_SECRET` not set | Add it to Render environment variables |
+| WhatsApp not sending | `WA_TO` not set | Add recipient number to Render env vars |
+| Neon DB sleeping | Free tier pauses after inactivity | UptimeRobot keeps Render alive; Neon wakes on first query |
 
 ---
 

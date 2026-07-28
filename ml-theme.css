@@ -1,0 +1,107 @@
+/* MirchiLime Connect — Design Tokens
+   Two themes: Warm Mirchi (light) · Control Room (dark)
+   Persist choice: localStorage['ml-credit-theme'] = 'light' | 'dark'
+*/
+
+:root,
+[data-theme="light"] {
+  --ml-bg:            #ECE4D6;
+  --ml-shell:         #FBF6EE;
+  --ml-panel:         #FFFCF7;
+  --ml-ink:           #2A211C;
+  --ml-text:          #3A2C24;
+  --ml-muted:         #6F5F52;
+  --ml-muted-2:       #A8937F;
+  --ml-muted-3:       #8A7B70;
+
+  --ml-lemon:         #F2C230;
+  --ml-lemon-2:       #F6D96B;
+  --ml-lemon-deep:    #B8860B;
+  --ml-lemon-deep-hv: #8A6100;
+  --ml-line-gold:     #E0A800;
+
+  --ml-olive:         #6C9A3E;
+  --ml-olive-text:    #4F7A28;
+  --ml-olive-tint:    #EDF4E1;
+
+  --ml-amber:         #E8A13C;
+  --ml-amber-chip-bg: #FCEEDE;
+  --ml-amber-chip-bd: #F5D9BE;
+  --ml-amber-text:    #B37217;
+
+  --ml-terra:         #D6543A;
+  --ml-terra-text:    #C0492D;
+  --ml-terra-tint:    #FBE3DC;
+
+  --ml-border:        #E4D7C3;
+  --ml-hairline:      #EFE3D3;
+  --ml-hairline-2:    #EADDCB;
+  --ml-hairline-3:    #F3EADB;
+
+  --ml-shell-shadow:  0 30px 60px -26px rgba(58,44,36,0.5);
+  --ml-cluster-high:  #D6543A;
+  --ml-cluster-mid:   #E8A13C;
+  --ml-cluster-low:   #6C9A3E;
+  --ml-cluster-text:  #173300;
+  --ml-cluster-glow:  none;
+}
+
+[data-theme="dark"] {
+  --ml-bg:            #070B10;
+  --ml-shell:         #0E141B;
+  --ml-panel:         #121A22;
+  --ml-ink:           #EAF1F6;
+  --ml-text:          #D5DEE6;
+  --ml-muted:         #93A4B2;
+  --ml-muted-2:       #6B7C8A;
+  --ml-muted-3:       #7A8E9B;
+
+  --ml-lemon:         #C6F135;
+  --ml-lemon-2:       #C6F135;
+  --ml-lemon-deep:    #C6F135;
+  --ml-lemon-deep-hv: #A9D42B;
+  --ml-line-gold:     #C6F135;
+
+  --ml-olive:         #5EEAD4;
+  --ml-olive-text:    #5EEAD4;
+  --ml-olive-tint:    rgba(198,241,53,0.12);
+
+  --ml-amber:         #F5B301;
+  --ml-amber-chip-bg: rgba(245,179,1,0.16);
+  --ml-amber-chip-bd: rgba(245,179,1,0.30);
+  --ml-amber-text:    #F5B301;
+
+  --ml-terra:         #FF5C5C;
+  --ml-terra-text:    #FF5C5C;
+  --ml-terra-tint:    rgba(255,92,92,0.16);
+
+  --ml-border:        #23303B;
+  --ml-hairline:      #23303B;
+  --ml-hairline-2:    #2A3A47;
+  --ml-hairline-3:    #1D2731;
+
+  --ml-shell-shadow:  0 34px 66px -24px rgba(6,10,14,0.7);
+  --ml-cluster-high:  #FF5C5C;
+  --ml-cluster-mid:   #F5B301;
+  --ml-cluster-low:   #C6F135;
+  --ml-cluster-text:  #0E141B;
+  --ml-cluster-glow:  0 0 14px;
+}
+
+/* Shared — theme-independent */
+:root {
+  --ml-font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --ml-font-body:    'Plus Jakarta Sans', system-ui, sans-serif;
+  --ml-font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+
+  --ml-radius-shell: 22px;
+  --ml-radius-card:  14px;
+  --ml-radius-btn:   11px;
+  --ml-radius-seg:   10px;
+  --ml-radius-chip:  8px;
+
+  --ml-transition-theme:  0.4s ease;
+  --ml-transition-toggle: 0.3s;
+
+  --ml-nav-h: 64px;
+}
