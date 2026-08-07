@@ -231,11 +231,11 @@
     <div class="ml-stat"><div class="ml-stat-val" id="stat-plazas">—</div><div class="ml-stat-lbl">Plazas</div></div>
   </div>
   <div class="ml-tabs">
-    <button class="ml-tab"        id="btn-trucks"     onclick="showView('trucks')">Trucks</button>
+    <button class="ml-tab active" id="btn-trucks"     onclick="showView('trucks')">Trucks</button>
     <button class="ml-tab"        id="btn-map"        onclick="showView('map')">Map View</button>
     <button class="ml-tab"        id="btn-routes"     onclick="showView('routes')">All Routes</button>
     <button class="ml-tab"        id="btn-report"     onclick="showView('report')">Report</button>
-    <button class="ml-tab active" id="btn-liveroutes" onclick="showView('liveroutes')">Live Routes</button>
+    <button class="ml-tab"        id="btn-liveroutes" onclick="showView('liveroutes')">Live Routes</button>
     <button class="ml-tab"        id="btn-credittrips" onclick="showView('credittrips')">Credit Trips</button>
   </div>
   <button class="ml-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
@@ -1556,7 +1556,7 @@ function toggleTheme() {
 // ════════════════════════════════════════
 loadTrucks();
 setInterval(loadTrucks, 15 * 60 * 1000);
-showView('liveroutes');
+showView('trucks');
 
 // ════════════════════════════════════════
 // LIVE ROUTES
