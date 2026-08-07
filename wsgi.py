@@ -123,7 +123,7 @@ def hundred_truck_details_batch():
     cur.execute('''
         SELECT vehicle_no, plaza, lat, lng, direction, crossed_at
         FROM crossings
-        WHERE vehicle_no IN (SELECT vehicle_no FROM trucks)
+        WHERE vehicle_no IN (SELECT vehicle_no FROM trucks WHERE is_connected=1)
           AND lat IS NOT NULL AND lat != 0
         ORDER BY vehicle_no, crossed_at
     ''')
@@ -146,7 +146,7 @@ def hundred_plazas():
                COUNT(*) as crossing_count
         FROM crossings
         WHERE lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0
-          AND (vehicle_no IN (SELECT vehicle_no FROM trucks)
+          AND (vehicle_no IN (SELECT vehicle_no FROM trucks WHERE is_connected=1)
                OR vehicle_no IN (SELECT truck_no FROM credit_trips))
         GROUP BY plaza ORDER BY truck_count DESC
     ''')
@@ -163,7 +163,7 @@ def hundred_truck_locations_at():
                    c.vehicle_no, t.owner, t.state,
                    c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
             FROM crossings c
-            JOIN trucks t ON c.vehicle_no = t.vehicle_no
+            JOIN trucks t ON c.vehicle_no = t.vehicle_no AND t.is_connected = 1
             WHERE c.crossed_at <= %s AND c.lat IS NOT NULL AND c.lat != 0
             ORDER BY c.vehicle_no, c.crossed_at DESC
         ) connected
@@ -192,7 +192,7 @@ def hundred_truck_locations():
                    c.vehicle_no, t.owner, t.state,
                    c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
             FROM crossings c
-            JOIN trucks t ON c.vehicle_no = t.vehicle_no
+            JOIN trucks t ON c.vehicle_no = t.vehicle_no AND t.is_connected = 1
             WHERE c.lat IS NOT NULL AND c.lat != 0
             ORDER BY c.vehicle_no, c.crossed_at DESC
         ) connected
@@ -286,7 +286,7 @@ def hundred_plaza_detail():
                MIN(c.crossed_at) as first_cross,
                MAX(c.crossed_at) as last_cross
         FROM crossings c
-        LEFT JOIN trucks t ON c.vehicle_no = t.vehicle_no
+        LEFT JOIN trucks t ON c.vehicle_no = t.vehicle_no AND t.is_connected = 1
         LEFT JOIN credit_trips ct ON c.vehicle_no = ct.truck_no
         WHERE c.plaza = %s
           AND (t.vehicle_no IS NOT NULL OR ct.truck_no IS NOT NULL)
