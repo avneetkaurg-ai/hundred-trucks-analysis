@@ -1555,7 +1555,7 @@ function toggleTheme() {
 // INIT
 // ════════════════════════════════════════
 loadTrucks();
-setInterval(loadTrucks, 1 * 60 * 60 * 1000);
+setInterval(loadTrucks, 15 * 60 * 1000);
 showView('liveroutes');
 
 // ════════════════════════════════════════
@@ -1867,14 +1867,16 @@ async function loadLiveRoutes() {
     }
   }
 
-  // fetch all truck details — render each card as soon as its data arrives
+  // fetch ALL truck crossings in one batch call instead of N individual requests
+  const batchRes = await fetch(`${API}/api/hundred-truck-details-batch`);
+  const batchData = await batchRes.json();
+  const crossingsByTruck = batchData.trucks || {};
+
   const truckData = [];
   const perTruckPromises = connected.map(async (truck, i) => {
     const color = TRUCK_COLORS[i % TRUCK_COLORS.length];
     try {
-      const r = await fetch(`${API}/api/hundred-truck-detail?vehicle_no=${truck.vehicle_no}`);
-      const d = await r.json();
-      const crossings = (d.crossings || []).filter(c => c.lat && c.lat !== 0);
+      const crossings = (crossingsByTruck[truck.vehicle_no] || []).filter(c => c.lat && c.lat !== 0);
       const td = { truck, color, crossings, tripInfo: enrouteMap[truck.vehicle_no] };
       truckData.push(td);
 

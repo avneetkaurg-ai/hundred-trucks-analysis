@@ -296,6 +296,10 @@ def hundred_plaza_detail():
     rows = fetchall(cur); con.close()
     return jsonify({'plaza': plaza, 'trucks': rows})
 
+@application.route('/api/keep-alive')
+def keep_alive():
+    return jsonify({'status': 'ok', 'time': datetime.datetime.utcnow().isoformat()})
+
 @application.route('/api/make-token')
 def api_make_token():
     vno = request.args.get('vehicle_no', '').strip().upper()
@@ -1000,7 +1004,7 @@ try:
     scheduler.add_job(sync_credit_trips,  'cron', hour=11, minute=0)            # 11:00 AM IST
     scheduler.add_job(sync_credit_trips,  'cron', hour=13, minute=0)            # 1:00 PM IST
     scheduler.add_job(sync_credit_trips,  'cron', hour=17, minute=0)            # 5:00 PM IST
-    scheduler.add_job(sync_enroute_trips, 'cron', hour='9,11,13,15,17,19', minute=0)  # every 2 hrs 9 AM–7 PM IST
+    scheduler.add_job(sync_enroute_trips, 'cron', hour='9,11,13,15,17,19,21,23', minute=0)  # every 2 hrs 9 AM–11 PM IST
     scheduler.add_job(auto_send_report,   'cron', hour=11, minute=5)            # 11:05 AM IST (after Zoho sync)
     scheduler.add_job(auto_send_report,   'cron', hour=19, minute=5)            # 7:05 PM IST (after Zoho sync)
     scheduler.start()
