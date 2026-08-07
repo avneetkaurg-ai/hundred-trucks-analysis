@@ -1574,6 +1574,7 @@ const lrRevGeoCache  = {};
 let lrActiveTruck = null;
 let lrLastTruckData = null;
 let lrTollActive = null; // vno whose toll plazas are shown on map
+let lrRenderTruckCard = null; // set by loadLiveRoutes so lrFilterTruck can re-render cards
 
 async function pingTruck(vno, btn) {
   btn.disabled = true;
@@ -1650,6 +1651,23 @@ function lrFilterTruck(vno) {
     el.style.outline = (!lrActiveTruck || el.dataset.vno !== lrActiveTruck) ? 'none' : '2px solid #2f6fd4';
   });
   if (lrLastTruckData) lrDrawMarkers(lrLastTruckData, lrActiveTruck);
+
+  // fetch full crossing history for this truck if we only have 1 point loaded
+  if (lrActiveTruck && lrLastTruckData && lrRenderTruckCard) {
+    const td = lrLastTruckData.find(t => t.truck.vehicle_no === lrActiveTruck);
+    if (td && td.crossings.length <= 1) {
+      fetch(`${API}/api/hundred-truck-detail?vehicle_no=${lrActiveTruck}`)
+        .then(r => r.json()).then(d => {
+          const full = (d.crossings || []).filter(c => c.lat && c.lat !== 0);
+          if (full.length > td.crossings.length) {
+            td.crossings = full;
+            td.crossingCount = full.length;
+            lrDrawMarkers(lrLastTruckData, lrActiveTruck);
+            lrRenderTruckCard(td);
+          }
+        }).catch(() => {});
+    }
+  }
 }
 
 let liveRoutesLastLoaded = 0;
@@ -1687,6 +1705,9 @@ async function initLiveRoutes() {
     return d;
   };
   mapLegend.addTo(liveRoutesMap);
+
+  // invalidateSize after layout settles to prevent blank tile issue on first load
+  setTimeout(() => liveRoutesMap && liveRoutesMap.invalidateSize(), 200);
 
   loadLiveRoutes().catch(e => console.error('loadLiveRoutes error:', e));
   setInterval(() => loadLiveRoutes().catch(e => console.error(e)), 1 * 60 * 60 * 1000);
@@ -1796,7 +1817,7 @@ async function loadLiveRoutes() {
     } catch(e) {}
   }
 
-  function renderTruckCard({ truck, color, crossings, tripInfo, crossingCount }) {
+  lrRenderTruckCard = function renderTruckCard({ truck, color, crossings, tripInfo, crossingCount }) {
     const last = crossings[crossings.length - 1];
     const locKey = last && last.lat ? `${last.lat.toFixed(2)},${last.lng.toFixed(2)}` : null;
     const cityName = locKey && revCache[locKey] ? revCache[locKey] : null;
@@ -1904,7 +1925,7 @@ async function loadLiveRoutes() {
       }
 
       // render card immediately — no geocoding wait
-      renderTruckCard(td);
+      lrRenderTruckCard(td);
 
       // draw this truck on the map right away
       lrLastTruckData = [...truckData];
@@ -1919,7 +1940,7 @@ async function loadLiveRoutes() {
             .then(g => g.json()).then(j => {
               const a = j.address || {};
               revCache[key] = [a.city||a.town||a.village||a.county||'', a.state||''].filter(Boolean).join(', ') || j.display_name?.split(',').slice(0,2).join(', ') || '';
-              renderTruckCard(td);
+              lrRenderTruckCard(td);
             }).catch(()=>{});
         }
       }
@@ -1927,7 +1948,7 @@ async function loadLiveRoutes() {
       // pincode geocode in background and re-render when done
       const pins = [td.tripInfo?.pincode, td.tripInfo?.dropPincode].filter(Boolean);
       if (pins.length) {
-        Promise.all(pins.map(geocodePin)).then(() => renderTruckCard(td)).catch(()=>{});
+        Promise.all(pins.map(geocodePin)).then(() => lrRenderTruckCard(td)).catch(()=>{});
       }
     } catch(e) {
       const td = { truck, color: TRUCK_COLORS[i % TRUCK_COLORS.length], crossings: [], tripInfo: enrouteMap[truck.vehicle_no] };
@@ -1939,21 +1960,7 @@ async function loadLiveRoutes() {
   lrLastTruckData = truckData;
   lrDrawMarkers(truckData, null);
 
-  // full crossings arrive in background — update truckData silently
-  batchPromise.then(r => r && r.json()).then(bd => {
-    if (!bd) return;
-    const full = bd.trucks || {};
-    truckData.forEach(td => {
-      const vno = td.truck.vehicle_no;
-      if (full[vno] && full[vno].length > 1) {
-        td.crossings = full[vno].filter(c => c.lat && c.lat !== 0);
-      }
-    });
-    lrLastTruckData = truckData;
-    // re-render cards and map only if no truck is currently selected
-    if (!lrActiveTruck) lrDrawMarkers(truckData, null);
-    truckData.forEach(td => renderTruckCard(td));
-  }).catch(() => {});
+  // full crossings are fetched on-demand when a truck is clicked (see lrFilterTruck)
 }
 
 function lrDrawMarkers(truckData, filterVno) {
