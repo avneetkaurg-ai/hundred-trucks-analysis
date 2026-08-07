@@ -1715,9 +1715,12 @@ async function loadLiveRoutes() {
   const connected = (data.trucks || []).filter(t => t.is_connected === 1 || t.is_connected === true);
   const lastPositions = posData.positions || {};
   // use last position as single-crossing array until full batch arrives
+  // store last position + real count; crossings array has 1 entry for map display
   let crossingsByTruck = {};
+  const crossingCountByTruck = {};
   for (const [vno, pos] of Object.entries(lastPositions)) {
     crossingsByTruck[vno] = [pos];
+    crossingCountByTruck[vno] = pos.total || 1;
   }
 
   cards.innerHTML = '';
@@ -1793,7 +1796,7 @@ async function loadLiveRoutes() {
     } catch(e) {}
   }
 
-  function renderTruckCard({ truck, color, crossings, tripInfo }) {
+  function renderTruckCard({ truck, color, crossings, tripInfo, crossingCount }) {
     const last = crossings[crossings.length - 1];
     const locKey = last && last.lat ? `${last.lat.toFixed(2)},${last.lng.toFixed(2)}` : null;
     const cityName = locKey && revCache[locKey] ? revCache[locKey] : null;
@@ -1828,11 +1831,12 @@ async function loadLiveRoutes() {
         <span style="color:#888;white-space:nowrap;margin-left:8px;">${tf}</span>
       </div>`;
     }).join('');
-    const tollToggleHtml = crossings.length > 0 ? `
+    const displayCount = crossingCount ?? crossings.length;
+    const tollToggleHtml = displayCount > 0 ? `
       <button onclick="event.stopPropagation();lrToggleTolls('${vno}')"
-        id="tolltoggle-${vno}" data-count="${crossings.length}"
+        id="tolltoggle-${vno}" data-count="${displayCount}"
         style="margin-top:6px;width:100%;text-align:left;background:#eef2ff;border:none;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;color:#3a4aad;cursor:pointer;">
-        🛣 Show Toll Plazas (${crossings.length})
+        🛣 Show Toll Plazas (${displayCount})
       </button>` : '';
 
     let arrivedHtml = '';
@@ -1869,7 +1873,7 @@ async function loadLiveRoutes() {
         ${cityName ? `<div style="font-size:12px;font-weight:700;color:#1a3a7a;margin-top:4px;">${cityName}</div>` : ''}
         <div style="font-size:10px;color:#1a1a2e;margin-top:2px;">${last ? last.plaza : '—'}</div>
         <div style="font-size:10px;color:#1a1a2e;font-weight:700;margin-top:1px;">${last ? new Date(last.crossed_at.replace(' ','T')+'+05:30').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—'}</div>
-        <div style="font-size:10px;color:#1a9e6e;margin-top:3px;font-weight:700;">${crossings.length} crossings</div>
+        <div style="font-size:10px;color:#1a9e6e;margin-top:3px;font-weight:700;">${displayCount} crossings</div>
         <div style="font-size:10px;color:#1a1a2e;font-weight:700;margin-top:2px;">Last ping: ${truck.fetched_at ? new Date((truck.fetched_at+'').replace(' ','T')+'+05:30').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—'}</div>
         ${collectHtml}
         ${arrivedHtml}
@@ -1888,7 +1892,7 @@ async function loadLiveRoutes() {
     const color = TRUCK_COLORS[i % TRUCK_COLORS.length];
     try {
       const crossings = (crossingsByTruck[truck.vehicle_no] || []).filter(c => c.lat && c.lat !== 0);
-      const td = { truck, color, crossings, tripInfo: enrouteMap[truck.vehicle_no] };
+      const td = { truck, color, crossings, tripInfo: enrouteMap[truck.vehicle_no], crossingCount: crossingCountByTruck[truck.vehicle_no] };
       truckData.push(td);
 
       // add legend chip immediately
