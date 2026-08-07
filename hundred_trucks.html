@@ -1276,7 +1276,8 @@ async function updateSlider() {
     trucks = data.trucks || [];
   }
 
-  document.getElementById('slider-trucks-count').textContent = `${trucks.length} trucks visible`;
+  const visibleCount = trucks.filter(t => connectedTruckNos.has(t.vehicle_no) || creditTruckNos.has(t.vehicle_no)).length;
+  document.getElementById('slider-trucks-count').textContent = `${visibleCount} trucks visible`;
 
   // update right panel list
   document.getElementById('rpt-truck-list').innerHTML = trucks.slice(0, 15).map(t => `
