@@ -1680,6 +1680,8 @@ async function initLiveRoutes() {
 
   await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
 
+  // force browser layout reflow so container has correct dimensions before Leaflet reads them
+  void document.getElementById('live-routes-map').offsetHeight;
   liveRoutesMap = L.map('live-routes-map').setView([18, 78], 5);
   L.tileLayer('https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png', {
     attribution: '© Stadia Maps © OpenStreetMap contributors', maxZoom: 20
@@ -1705,9 +1707,6 @@ async function initLiveRoutes() {
     return d;
   };
   mapLegend.addTo(liveRoutesMap);
-
-  // invalidateSize after layout settles to prevent blank tile issue on first load
-  setTimeout(() => liveRoutesMap && liveRoutesMap.invalidateSize(), 200);
 
   loadLiveRoutes().catch(e => console.error('loadLiveRoutes error:', e));
   setInterval(() => loadLiveRoutes().catch(e => console.error(e)), 1 * 60 * 60 * 1000);
