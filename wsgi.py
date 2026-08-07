@@ -116,6 +116,27 @@ def hundred_truck_detail():
         'date_to':   dates[-1][:10] if dates else '—',
     })
 
+@application.route('/api/hundred-truck-details-batch')
+def hundred_truck_details_batch():
+    """Return crossings for all connected trucks in one query — replaces N per-truck calls."""
+    con = get_db(); cur = con.cursor()
+    cur.execute('''
+        SELECT vehicle_no, plaza, lat, lng, direction, crossed_at
+        FROM crossings
+        WHERE vehicle_no IN (SELECT vehicle_no FROM trucks)
+          AND lat IS NOT NULL AND lat != 0
+        ORDER BY vehicle_no, crossed_at
+    ''')
+    rows = fetchall(cur)
+    con.close()
+    by_truck = {}
+    for r in rows:
+        vno = r['vehicle_no']
+        if vno not in by_truck:
+            by_truck[vno] = []
+        by_truck[vno].append(r)
+    return jsonify({'trucks': by_truck})
+
 @application.route('/api/hundred-plazas')
 def hundred_plazas():
     con = get_db(); cur = con.cursor()
@@ -125,6 +146,8 @@ def hundred_plazas():
                COUNT(*) as crossing_count
         FROM crossings
         WHERE lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0
+          AND (vehicle_no IN (SELECT vehicle_no FROM trucks)
+               OR vehicle_no IN (SELECT truck_no FROM credit_trips))
         GROUP BY plaza ORDER BY truck_count DESC
     ''')
     rows = fetchall(cur); con.close()
@@ -135,17 +158,28 @@ def hundred_truck_locations_at():
     at = request.args.get('at', '')
     con = get_db(); cur = con.cursor()
     cur.execute('''
-        SELECT c.vehicle_no, t.owner, t.state,
-               c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
-        FROM crossings c
-        JOIN trucks t ON c.vehicle_no = t.vehicle_no
-        WHERE c.id IN (
-            SELECT id FROM crossings c2
-            WHERE c2.vehicle_no = c.vehicle_no AND c2.crossed_at <= %s
-            ORDER BY c2.crossed_at DESC LIMIT 1
-        )
-        AND c.lat IS NOT NULL AND c.lat != 0
-    ''', (at,))
+        SELECT * FROM (
+            SELECT DISTINCT ON (c.vehicle_no)
+                   c.vehicle_no, t.owner, t.state,
+                   c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
+            FROM crossings c
+            JOIN trucks t ON c.vehicle_no = t.vehicle_no
+            WHERE c.crossed_at <= %s AND c.lat IS NOT NULL AND c.lat != 0
+            ORDER BY c.vehicle_no, c.crossed_at DESC
+        ) connected
+
+        UNION ALL
+
+        SELECT * FROM (
+            SELECT DISTINCT ON (c.vehicle_no)
+                   c.vehicle_no, ct.tranco as owner, NULL as state,
+                   c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
+            FROM crossings c
+            JOIN credit_trips ct ON c.vehicle_no = ct.truck_no
+            WHERE c.crossed_at <= %s AND c.lat IS NOT NULL AND c.lat != 0
+            ORDER BY c.vehicle_no, c.crossed_at DESC
+        ) credit
+    ''', (at, at))
     rows = fetchall(cur); con.close()
     return jsonify({'trucks': rows})
 
@@ -153,16 +187,27 @@ def hundred_truck_locations_at():
 def hundred_truck_locations():
     con = get_db(); cur = con.cursor()
     cur.execute('''
-        SELECT c.vehicle_no, t.owner, t.state,
-               c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
-        FROM crossings c
-        JOIN trucks t ON c.vehicle_no = t.vehicle_no
-        WHERE c.id IN (
-            SELECT id FROM crossings c2
-            WHERE c2.vehicle_no = c.vehicle_no
-            ORDER BY c2.crossed_at DESC LIMIT 1
-        )
-        AND c.lat IS NOT NULL AND c.lat != 0
+        SELECT * FROM (
+            SELECT DISTINCT ON (c.vehicle_no)
+                   c.vehicle_no, t.owner, t.state,
+                   c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
+            FROM crossings c
+            JOIN trucks t ON c.vehicle_no = t.vehicle_no
+            WHERE c.lat IS NOT NULL AND c.lat != 0
+            ORDER BY c.vehicle_no, c.crossed_at DESC
+        ) connected
+
+        UNION ALL
+
+        SELECT * FROM (
+            SELECT DISTINCT ON (c.vehicle_no)
+                   c.vehicle_no, ct.tranco as owner, NULL as state,
+                   c.plaza as last_plaza, c.lat, c.lng, c.crossed_at as last_seen
+            FROM crossings c
+            JOIN credit_trips ct ON c.vehicle_no = ct.truck_no
+            WHERE c.lat IS NOT NULL AND c.lat != 0
+            ORDER BY c.vehicle_no, c.crossed_at DESC
+        ) credit
     ''')
     rows = fetchall(cur); con.close()
     return jsonify({'trucks': rows})
@@ -234,14 +279,19 @@ def hundred_plaza_detail():
     plaza = request.args.get('plaza', '').strip()
     con = get_db(); cur = con.cursor()
     cur.execute('''
-        SELECT c.vehicle_no, t.owner, t.state,
+        SELECT c.vehicle_no,
+               COALESCE(t.owner, ct.tranco, 'Unknown') as owner,
+               t.state,
                COUNT(*) as cross_count,
-               MIN(crossed_at) as first_cross,
-               MAX(crossed_at) as last_cross
+               MIN(c.crossed_at) as first_cross,
+               MAX(c.crossed_at) as last_cross
         FROM crossings c
-        JOIN trucks t ON c.vehicle_no = t.vehicle_no
+        LEFT JOIN trucks t ON c.vehicle_no = t.vehicle_no
+        LEFT JOIN credit_trips ct ON c.vehicle_no = ct.truck_no
         WHERE c.plaza = %s
-        GROUP BY c.vehicle_no, t.owner, t.state ORDER BY cross_count DESC, c.vehicle_no
+          AND (t.vehicle_no IS NOT NULL OR ct.truck_no IS NOT NULL)
+        GROUP BY c.vehicle_no, t.owner, ct.tranco, t.state
+        ORDER BY cross_count DESC, c.vehicle_no
     ''', (plaza,))
     rows = fetchall(cur); con.close()
     return jsonify({'plaza': plaza, 'trucks': rows})
