@@ -1851,10 +1851,10 @@ async function loadLiveRoutes() {
         ${loadingHtml}
         ${departHtml}
         ${cityName ? `<div style="font-size:12px;font-weight:700;color:#1a3a7a;margin-top:4px;">${cityName}</div>` : ''}
-        <div style="font-size:10px;color:#aaa;margin-top:2px;">${last ? last.plaza : '—'}</div>
-        <div style="font-size:10px;color:#aaa;margin-top:1px;">${last ? new Date(last.crossed_at.replace(' ','T')+'+05:30').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—'}</div>
+        <div style="font-size:10px;color:#1a1a2e;margin-top:2px;">${last ? last.plaza : '—'}</div>
+        <div style="font-size:10px;color:#1a1a2e;font-weight:700;margin-top:1px;">${last ? new Date(last.crossed_at.replace(' ','T')+'+05:30').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—'}</div>
         <div style="font-size:10px;color:#1a9e6e;margin-top:3px;font-weight:700;">${crossings.length} crossings</div>
-        <div style="font-size:10px;color:#aaa;margin-top:2px;">Last ping: ${truck.fetched_at ? new Date((truck.fetched_at+'').replace(' ','T')+'+05:30').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—'}</div>
+        <div style="font-size:10px;color:#1a1a2e;font-weight:700;margin-top:2px;">Last ping: ${truck.fetched_at ? new Date((truck.fetched_at+'').replace(' ','T')+'+05:30').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'}) : '—'}</div>
         ${collectHtml}
         ${arrivedHtml}
         ${tollToggleHtml}
