@@ -2472,7 +2472,8 @@ function ctDiamondSvg(colors, clipId) {
 function ctDrawMarkers(truckData, filterVno) {
   ctMap.eachLayer(l => { if (l instanceof L.Polyline || l instanceof L.Marker || l instanceof L.CircleMarker) ctMap.removeLayer(l); });
 
-  const visible = filterVno ? truckData.filter(td => td.trip.truck_no === filterVno) : truckData;
+  const filterSet = Array.isArray(filterVno) ? new Set(filterVno) : (filterVno ? new Set([filterVno]) : null);
+  const visible = filterSet ? truckData.filter(td => filterSet.has(td.trip.truck_no)) : truckData;
   const allBounds = [];
   const originGroups  = {};
   const currentGroups = {};
@@ -2567,6 +2568,15 @@ function ctDrawMarkers(truckData, filterVno) {
     if (group.trucks.length === 1) {
       ctDiamondMarker.on('click', () => ctFilterTruck(group.trucks[0].trip.truck_no));
     } else {
+      ctDiamondMarker.on('click', () => {
+        const vnos = group.trucks.map(t => t.trip.truck_no);
+        ctActiveTruck = vnos[0]; // highlight first in sidebar
+        document.querySelectorAll('.ct-truck-card').forEach(el => {
+          el.style.opacity = vnos.includes(el.dataset.vno) ? '1' : '0.35';
+          el.style.outline = 'none';
+        });
+        if (ctLastData) ctDrawMarkers(ctLastData, vnos);
+      });
       ctDiamondMarker.bindPopup(`<div style="font-size:12px;line-height:1.8;min-width:160px;">${popupHtml}</div>`);
     }
     allBounds.push(group.coord);
