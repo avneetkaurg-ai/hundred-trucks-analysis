@@ -135,15 +135,22 @@ def hundred_truck_details_batch():
 
 @application.route('/api/hundred-truck-positions')
 def hundred_truck_positions():
-    """Return only the latest crossing per connected truck — fast initial load."""
+    """Return latest crossing + total count per connected truck — fast initial load."""
     con = get_db(); cur = con.cursor()
     cur.execute('''
-        SELECT DISTINCT ON (vehicle_no)
-               vehicle_no, plaza, lat, lng, crossed_at
-        FROM crossings
-        WHERE vehicle_no IN (SELECT vehicle_no FROM trucks WHERE is_connected=1)
-          AND lat IS NOT NULL AND lat != 0
-        ORDER BY vehicle_no, crossed_at DESC
+        SELECT DISTINCT ON (c.vehicle_no)
+               c.vehicle_no, c.plaza, c.lat, c.lng, c.crossed_at,
+               counts.total
+        FROM crossings c
+        JOIN (
+            SELECT vehicle_no, COUNT(*) as total
+            FROM crossings
+            WHERE vehicle_no IN (SELECT vehicle_no FROM trucks WHERE is_connected=1)
+            GROUP BY vehicle_no
+        ) counts ON c.vehicle_no = counts.vehicle_no
+        WHERE c.vehicle_no IN (SELECT vehicle_no FROM trucks WHERE is_connected=1)
+          AND c.lat IS NOT NULL AND c.lat != 0
+        ORDER BY c.vehicle_no, c.crossed_at DESC
     ''')
     rows = fetchall(cur)
     con.close()
@@ -308,8 +315,20 @@ def hundred_plaza_detail():
     rows = fetchall(cur); con.close()
     return jsonify({'plaza': plaza, 'trucks': rows})
 
+_last_keepalive_ping = 0  # epoch seconds of last ping triggered via keep-alive
+
 @application.route('/api/keep-alive')
 def keep_alive():
+    global _last_keepalive_ping
+    now = time.time()
+    # If APScheduler missed a ping (server was asleep), trigger one now — max once per hour
+    if now - _last_keepalive_ping > 3600:
+        ist_hour = (datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)).hour
+        if 6 <= ist_hour <= 23:
+            _last_keepalive_ping = now
+            import threading
+            threading.Thread(target=ping_enroute, daemon=True).start()
+            print(f'[keep-alive] triggered ping_enroute at IST hour {ist_hour}', flush=True)
     return jsonify({'status': 'ok', 'time': datetime.datetime.utcnow().isoformat()})
 
 @application.route('/api/make-token')
@@ -959,10 +978,12 @@ def check_trip_completion():
         print(f'[check_trip_completion] ERROR: {e}', flush=True)
 
 def ping_enroute():
-    # First sync fresh trip list from Zoho, then ping FASTag for each truck
+    # First sync fresh trip list from Zoho, then ping FASTag for each connected truck
     sync_enroute_trips()
     con = get_db(); cur = con.cursor()
-    cur.execute('SELECT DISTINCT truck_no FROM enroute_trips')
+    # Always ping all connected trucks (is_connected=1), not just Zoho enroute list
+    # — Zoho may clear trips after delivery, leaving fetched_at stuck otherwise
+    cur.execute('SELECT vehicle_no FROM trucks WHERE is_connected=1')
     trucks = [r[0] for r in cur.fetchall()]
     con.close()
     print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] Ping enroute: {len(trucks)} trucks...', flush=True)
