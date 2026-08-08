@@ -548,6 +548,14 @@ async function loadTrucks() {
     document.getElementById('stat-plazas').textContent = trucksData.total_plazas || '—';
     const rptTrucks = document.getElementById('rpt-total-trucks');
     if (rptTrucks) rptTrucks.textContent = connectedTruckNos.size + creditTruckNos.size;
+    // keep Live Routes "Last Ping" display in sync with latest fetched_at
+    const lrLastPingEl = document.getElementById('lr-last-ping');
+    if (lrLastPingEl) {
+      const lastPinged = allTrucks.filter(t => t.is_connected === 1 || t.is_connected === true)
+        .map(t => t.fetched_at).filter(Boolean).sort().pop();
+      if (lastPinged) lrLastPingEl.textContent = new Date((lastPinged+'').replace(' ','T')+'+05:30')
+        .toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kolkata'});
+    }
     applyFilter();
     // re-filter routes if already loaded
     if (allRoutes.length === 0 && _allRoutesRaw.length > 0) {
