@@ -394,7 +394,7 @@ def remove_enroute():
     try:
         con = get_db(); cur = con.cursor()
         cur.execute('DELETE FROM enroute_trips WHERE truck_no=%s', (vno,))
-        cur.execute('UPDATE trucks SET is_connected=0, is_manual=FALSE WHERE vehicle_no=%s', (vno,))
+        cur.execute('UPDATE trucks SET is_connected=0 WHERE vehicle_no=%s AND (is_manual IS FALSE OR is_manual IS NULL)', (vno,))
         con.commit(); con.close()
         return jsonify({'status': 'removed', 'vehicle_no': vno})
     except Exception as e:
@@ -774,7 +774,7 @@ def sync_enroute_trips():
             if not cur.fetchone():
                 state = vno[:2].upper() if len(vno) >= 2 else 'TN'
                 cur.execute(
-                    'INSERT INTO trucks (vehicle_no, owner, state, is_connected) VALUES (%s, %s, %s, 1)',
+                    'INSERT INTO trucks (vehicle_no, owner, state, is_connected, is_manual) VALUES (%s, %s, %s, 1, FALSE)',
                     (vno, tranco, state)
                 )
                 new_trucks += 1
