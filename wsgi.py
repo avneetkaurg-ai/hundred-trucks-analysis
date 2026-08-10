@@ -1033,9 +1033,17 @@ try:
     ensure_credit_trips_table()
     ensure_enroute_trips_table()
     sync_credit_trips()    # sync on startup
-    # run full ping on startup so fetched_at is current immediately after deploy
-    import threading
-    threading.Thread(target=ping_enroute, daemon=True).start()
+    # wait until next top-of-hour then ping, so fetched_at stays on clean hourly boundaries
+    import threading, time as _time
+    def _ping_on_hour():
+        import datetime as _dt
+        now = _dt.datetime.now()
+        secs_to_next_hour = (60 - now.minute) * 60 - now.second
+        if secs_to_next_hour > 3540:  # already within 1 min of the hour — ping now
+            secs_to_next_hour = 0
+        _time.sleep(secs_to_next_hour)
+        ping_enroute()
+    threading.Thread(target=_ping_on_hour, daemon=True).start()
     scheduler = BackgroundScheduler(timezone='Asia/Kolkata')
     scheduler.add_job(ping_enroute,       'cron', hour='6-23', minute=0)         # every hour 6 AM–11 PM IST (skip 12 AM–5 AM to save DB compute)
     scheduler.add_job(ping_credit,        'cron', hour=11, minute=0)            # 11:00 AM IST (Zoho sync + FASTag ping)
