@@ -2675,12 +2675,22 @@ function ctDrawMarkers(truckData, filterVno) {
     } else {
       ctDiamondMarker.on('click', () => {
         const vnos = group.trucks.map(t => t.trip.truck_no);
-        ctActiveTruck = vnos[0]; // highlight first in sidebar
-        document.querySelectorAll('.ct-truck-card').forEach(el => {
-          el.style.opacity = vnos.includes(el.dataset.vno) ? '1' : '0.35';
-          el.style.outline = 'none';
-        });
-        if (ctLastData) ctDrawMarkers(ctLastData, vnos);
+        const alreadyActive = ctActiveTruck && vnos.includes(ctActiveTruck);
+        if (alreadyActive) {
+          // toggle off — go back to all diamonds
+          ctActiveTruck = null;
+          document.querySelectorAll('.ct-truck-card').forEach(el => {
+            el.style.opacity = '1'; el.style.outline = 'none';
+          });
+          if (ctLastData) ctDrawMarkers(ctLastData, null);
+        } else {
+          ctActiveTruck = vnos[0];
+          document.querySelectorAll('.ct-truck-card').forEach(el => {
+            el.style.opacity = vnos.includes(el.dataset.vno) ? '1' : '0.35';
+            el.style.outline = 'none';
+          });
+          if (ctLastData) ctDrawMarkers(ctLastData, vnos);
+        }
       });
       ctDiamondMarker.bindPopup(`<div style="font-size:12px;line-height:1.8;min-width:160px;">${popupHtml}</div>`);
     }
