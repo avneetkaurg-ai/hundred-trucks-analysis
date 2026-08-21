@@ -542,7 +542,7 @@ async function loadTrucks() {
       pickup:   t.pickup   || '—',
       drop:     t.drop_city || t.drop || '—',
     }));
-    connectedTruckNos = new Set(allTrucks.filter(t => t.is_connected === 1 || t.is_connected === true).map(t => t.vehicle_no));
+    connectedTruckNos = new Set(allTrucks.filter(t => (t.is_connected === 1 || t.is_connected === true) && !t.is_manual).map(t => t.vehicle_no));
     creditTruckNos    = new Set(allCreditTrucks.map(t => t.truck_no));
     _trucksReadyResolve();
     const activeTruckCount = connectedTruckNos.size + creditTruckNos.size;
@@ -1849,7 +1849,7 @@ async function loadLiveRoutes() {
 
   const data      = await trucksRes.json();
   const posData   = await posRes.json();
-  const connected = (data.trucks || []).filter(t => t.is_connected === 1 || t.is_connected === true);
+  const connected = (data.trucks || []).filter(t => (t.is_connected === 1 || t.is_connected === true) && !t.is_manual);
   const lastPositions = posData.positions || {};
   // use last position as single-crossing array until full batch arrives
   // store last position + real count; crossings array has 1 entry for map display
